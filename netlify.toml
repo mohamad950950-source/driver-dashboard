@@ -3,22 +3,9 @@
   functions = "api"
   publish = "."
 
-[functions]
-  included_files = ["templates/**", "api/**", "db.py", "app.py", "schema_pg.py", "translations.py", "static/**"]
-
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/main"
-  status = 200
-
-[[redirects]]
-  from = "/static/*"
-  to = "/static/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/uploads/*"
-  to = "/uploads/:splat"
   status = 200
 
 [[redirects]]
