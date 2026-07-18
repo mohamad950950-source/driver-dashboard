@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.pg{max-width:560px;margin:0 auto}
+.steps-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:12px}
+.steps-card h3{font-size:.9rem;font-weight:600;color:var(--text-title);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.steps-card ol{padding-{% if dir=='rtl' %}right{% else %}left{% endif %}:1.25rem;font-size:.78rem;color:var(--text-body);line-height:1.8}
+.steps-card .or-divider{text-align:center;color:var(--text-faint);font-size:.72rem;padding:8px 0;letter-spacing:1px}
+.upload-zone{background:var(--bg-input);border:2px dashed var(--border);border-radius:var(--radius);padding:1.5rem 1rem;text-align:center;cursor:pointer;transition:all .2s;margin-top:8px}
+.upload-zone:hover{border-color:var(--accent);background:var(--accent-glow)}
+.upload-zone input{display:none}
+.upload-zone .uz-icon{font-size:1.5rem;margin-bottom:6px;opacity:.5}
+.upload-zone .uz-text{font-size:.82rem;color:var(--text-body)}
+.upload-zone .uz-sub{font-size:.68rem;color:var(--text-faint);margin-top:4px}
+</style>
+
+<div class="pg">
+  <div class="pg-hdr"><h1>{{ _('ربط الحسابات') }}</h1></div>
+
+  {% for pid, pname, pcolor in [('uber', 'Uber', '#10b981'), ('didi', 'Didi', '#f97316'), ('indrive', 'InDrive', '#ef4444')] %}
+  <div class="steps-card" id="card-{{ pid }}">
+    <h3>
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ pcolor }}"></span>
+      {{ pname }}
+      <span id="status-{{ pid }}" style="font-size:.68rem;font-weight:400;color:var(--text-faint)"></span>
+    </h3>
+    <ol>
+      <li>{{ _('افتح تطبيق') }} {{ pname }} {{ _('Driver') }}</li>
+      <li>{{ _('روح لـ: الاعدادات ← بياناتي') }}</li>
+      <li>{{ _('اضغط على تصدير البيانات ← CSV') }}</li>
+    </ol>
+    <div class="or-divider">— {{ _('أو') }} —</div>
+    <div class="upload-zone" id="uz-{{ pid }}" onclick="document.getElementById('file-{{ pid }}').click()">
+      <div class="uz-icon">↑</div>
+      <div class="uz-text">{{ _('ارفع ملف CSV') }}</div>
+      <div class="uz-sub">{{ _('من App السواق - تصدير الرحلات') }}</div>
+      <input type="file" id="file-{{ pid }}" accept=".csv" onchange="uploadCSV('{{ pid }}', this)">
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+async function loadConnections(){
+  try{
+    const r=await api('/api/connected-accounts');
+    r.accounts.forEach(a=>{
+      const el=document.getElementById('status-'+a.platform);
+      if(el) el.textContent = a.status==='connected' ? '✅ {{ _('متصل') }}' : '';
+    });
+  }catch(e){}
+}
+async function uploadCSV(pid, input){
+  if(!input.files.length) return;
+  const f=input.files[0];
+  const text=await f.text();
+  const btn=document.getElementById('uz-'+pid);
+  btn.style.opacity='.5';
+  btn.querySelector('.uz-text').textContent='{{ _('جاري الرفع...') }}';
+  try{
+    const r=await api('/api/upload-csv',{method:'POST',body:JSON.stringify({platform:pid,csv:text})});
+    if(r.count) toast('{{ _('تم استيراد') }} '+r.count+' {{ _('مشوار') }}');
+    else toast('{{ _('تم الرفع') }}','var(--green)');
+    loadConnections();
+  }catch(e){toast('{{ _('خطأ: ') }}'+e.message,'var(--red)')}
+  btn.style.opacity='1';
+  btn.querySelector('.uz-text').textContent='{{ _('ارفع ملف CSV') }}';
+}
+document.addEventListener('DOMContentLoaded',loadConnections);
+</script>
+{% endblock %}

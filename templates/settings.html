@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+.card h3{font-size:.9rem;font-weight:600;color:var(--text-title);margin-bottom:.6rem}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:1rem}
+@media(max-width:600px){.charts-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="header">
+  <h1>{% if user.role == 'owner' %}{{ _('اعدادات المالك') }}{% else %}{{ _('الاعدادات') }}{% endif %}</h1>
+  <div class="header-left">
+    {% if user.role != 'owner' %}<button class="btn btn-primary" onclick="saveSettings()">{{ _('حفظ الاعدادات') }}</button>{% endif %}
+  </div>
+</div>
+
+<div class="charts-grid">
+  <!-- Language -->
+  <div class="card" style="border:1px solid var(--accent);border-radius:var(--radius);padding:1.25rem">
+    <h3 style="margin-bottom:1rem;color:var(--text2);font-size:.9rem">{{ _('اللغة') }} / Language</h3>
+    <div style="display:flex;gap:12px;margin-bottom:8px">
+      <button class="btn {% if lang=='ar' %}btn-primary{% endif %}" style="flex:1;font-size:.85rem" onclick="setLang('ar')">{{ _('العربية') }}</button>
+      <button class="btn {% if lang=='en' %}btn-primary{% endif %}" style="flex:1;font-size:.85rem" onclick="setLang('en')">{{ _('الانجليزية') }}</button>
+    </div>
+  </div>
+
+  {% if user.role == 'owner' %}
+  <!-- Owner car settings -->
+  <div class="card" style="border:1px solid var(--green);border-radius:var(--radius);padding:1.25rem">
+    <h3 style="margin-bottom:1rem;color:var(--green);font-size:.9rem">{{ _('بيانات العربية') }}</h3>
+    <div class="form-group"><label>{{ _('اسم العربية') }}</label><input type="text" id="carName" placeholder="{{ _('هيونداي النترا 2022') }}"></div>
+    <div class="form-group"><label>{{ _('رقم اللوحة') }}</label><input type="text" id="plateNumber" placeholder="{{ _('س ج ى 1234') }}"></div>
+  </div>
+  <div class="card" style="border:1px solid var(--green);border-radius:var(--radius);padding:1.25rem">
+    <h3 style="margin-bottom:1rem;color:var(--green);font-size:.9rem">{{ _('استهلاك الوقود') }}</h3>
+    <div class="form-group"><label>{{ _('نوع الوقود') }}</label><select id="fuelType">
+      <option value="بنزين 92">{{ _('بنزين 92') }}</option>
+      <option value="بنزين 95">{{ _('بنزين 95') }}</option>
+      <option value="سولار">{{ _('سولار') }}</option>
+      <option value="غاز">{{ _('غاز طبيعي') }}</option>
+    </select></div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('سعر اللتر') }}</label><input type="number" id="fuelCost" step="0.01"></div>
+      <div class="form-group"><label>{{ _('كم/لتر') }}</label><input type="number" id="kmPerLiter" step="0.1"></div>
+    </div>
+  </div>
+  <div class="card" style="border:1px solid var(--green);border-radius:var(--radius);padding:1.25rem">
+    <h3 style="margin-bottom:1rem;color:var(--green);font-size:.9rem">{{ _('تقسيم الارباح') }}</h3>
+    <div class="form-group"><label>{{ _('نسبة الشريك (%)') }}</label>
+      <input type="number" id="partnerShare" min="0" max="100" step="1">
+      <div style="margin-top:4px;font-size:.78rem;color:var(--text2)">{{ _('نصيبك:') }} <span id="yourShareDisp">50</span>% — {{ _('الشريك:') }} <span id="partnerShareDisp">50</span>%</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if user.role != 'owner' %}
+  <!-- Accounts (CSV Upload) → inside Settings for drivers -->
+  <div class="card" style="border:1px solid var(--accent);border-radius:var(--radius);padding:1rem">
+    <h3 style="margin-bottom:.6rem;color:var(--accent);font-size:.85rem">{{ _('ربط الحسابات') }}</h3>
+    <p style="font-size:.72rem;color:var(--text-muted);margin-bottom:10px">{{ _('ارفع ملف CSV من تطبيق السواق عشان تجيب المشاوير') }}</p>
+    {% for pid, pname in [('uber', 'Uber'), ('didi', 'Didi'), ('indrive', 'InDrive')] %}
+    <div style="display:flex;align-items:center;gap:8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:.55rem .7rem;margin-bottom:6px;font-size:.76rem;direction:ltr;text-align:{% if dir=='rtl' %}right{% else %}left{% endif %}">
+      {% if pid == 'uber' %}
+      <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0"><rect x="0" y="0" width="24" height="24" rx="5" fill="#000"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-weight="700" font-size="6.5" font-family="Arial,sans-serif">Uber</text></svg>
+      {% elif pid == 'didi' %}
+      <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0"><rect x="0" y="0" width="24" height="24" rx="6" fill="#FF6600"/><path d="M9 8h3a4 4 0 010 8H9V8zm1.5 1.5v5h1.5a2.5 2.5 0 000-5z" fill="#fff"/></svg>
+      {% elif pid == 'indrive' %}
+      <svg width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0"><rect x="0" y="0" width="24" height="24" rx="6" fill="#00B14F"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-weight="700" font-size="10" font-family="Arial,sans-serif">in</text></svg>
+      {% endif %}
+      <span style="color:var(--text-title);font-weight:600;font-size:.76rem">{{ pname }}</span>
+      <span id="status-{{ pid }}" style="font-size:.65rem;color:var(--text-faint);flex:1"></span>
+      <button class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:.65rem" onclick="document.getElementById('file-{{ pid }}').click()">{{ _('CSV') }}</button>
+      <input type="file" id="file-{{ pid }}" accept=".csv" style="display:none" onchange="uploadCSV('{{ pid }}', this)">
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Export -->
+  <div class="card" style="border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem">
+    <h3 style="margin-bottom:1rem;color:var(--text2);font-size:.9rem">{{ _('تصدير البيانات') }}</h3>
+    <p style="font-size:.82rem;color:var(--text2);margin-bottom:12px">{{ _('حمل كل بياناتك للنسخ الاحتياطي') }}</p>
+    <div class="form-row">
+      <button class="btn" onclick="exportData('month')">{{ _('آخر شهر') }}</button>
+      <button class="btn" onclick="exportData('year')">{{ _('آخر سنة') }}</button>
+      <button class="btn" onclick="exportData('all')">{{ _('كل البيانات') }}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadSettings() {
+  const r = await api('/api/car-settings');
+  document.getElementById('carName').value = r.car_name || '';
+  document.getElementById('plateNumber').value = r.plate_number || '';
+  document.getElementById('fuelType').value = r.fuel_type || 'بنزين 95';
+  document.getElementById('fuelCost').value = r.fuel_type === 'بنزين 95' ? '24' : (r.fuel_cost_per_liter || '12.5');
+  document.getElementById('kmPerLiter').value = r.km_per_liter || '12';
+  const ps = parseInt(r.partner_share_pct) || 50;
+  const doc = document.getElementById('partnerShare');
+  if(doc) {
+    doc.value = ps;
+    document.getElementById('yourShareDisp').textContent = 100-ps;
+    document.getElementById('partnerShareDisp').textContent = ps;
+    doc.addEventListener('input', function(){
+      document.getElementById('yourShareDisp').textContent = 100-parseInt(this.value||50);
+      document.getElementById('partnerShareDisp').textContent = parseInt(this.value||50);
+    });
+  }
+  // Load account statuses
+  try{
+    const ca=await api('/api/connected-accounts');
+    ca.accounts.forEach(a=>{
+      const el=document.getElementById('status-'+a.platform);
+      if(el) el.textContent = a.status==='connected' ? '✅ {{ _('متصل') }}' : '';
+    });
+  }catch(e){}
+}
+async function setLang(lang) {
+  await api('/api/set-lang', {method:'POST', body:JSON.stringify({lang: lang})});
+  window.location.reload();
+}
+async function saveSettings() {
+  const data = {
+    car_name: document.getElementById('carName').value,
+    plate_number: document.getElementById('plateNumber').value,
+    fuel_type: document.getElementById('fuelType').value,
+    fuel_cost_per_liter: document.getElementById('fuelCost').value,
+    km_per_liter: document.getElementById('kmPerLiter').value,
+    partner_share_pct: document.getElementById('partnerShare')?.value || '50',
+  };
+  await api('/api/car-settings',{method:'POST',body:JSON.stringify(data)});
+  toast('{{ _('تم حفظ الاعدادات') }}');
+}
+function exportData(period) {
+  window.open(`/api/export/json?period=${period}`, '_blank');
+}
+async function uploadCSV(pid, input){
+  if(!input.files.length) return;
+  const text=await input.files[0].text();
+  try{
+    const r=await api('/api/upload-csv',{method:'POST',body:JSON.stringify({platform:pid,csv:text})});
+    toast(r.count ? '{{ _('تم استيراد') }} '+r.count+' {{ _('مشوار') }}' : '{{ _('تم الرفع') }}');
+  }catch(e){toast('{{ _('خطأ: ') }}'+e.message,'var(--red)')}
+}
+document.addEventListener('DOMContentLoaded', loadSettings);
+</script>
+{% endblock %}

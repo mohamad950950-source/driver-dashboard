@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إنشاء حساب | Driver Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--purple:#bc8cff;--radius:12px;--font:system-ui,'Segoe UI',-apple-system,sans-serif}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;direction:rtl}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:2.5rem;width:440px;max-width:92vw}
+.logo{font-size:3rem;text-align:center;margin-bottom:.5rem}
+h1{text-align:center;font-size:1.3rem;margin-bottom:4px}
+.desc{text-align:center;color:var(--text2);font-size:.85rem;margin-bottom:1.5rem;line-height:1.5}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;margin-bottom:4px;color:var(--text2);font-size:.82rem;font-weight:500}
+input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;width:100%;font-family:inherit;font-size:.9rem;transition:border-color .15s}
+input:focus{outline:2px solid var(--accent);border-color:transparent}
+select{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;width:100%;font-family:inherit;font-size:.9rem;cursor:pointer}
+select:focus{outline:2px solid var(--accent)}
+.btn{display:block;width:100%;padding:11px;border-radius:8px;border:none;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{filter:brightness(1.2)}
+.error-msg{background:var(--red);color:#fff;padding:8px 14px;border-radius:8px;font-size:.82rem;margin-bottom:12px;display:none}
+.footer{text-align:center;margin-top:1rem;font-size:.78rem;color:var(--text2)}
+.footer a{color:var(--accent);text-decoration:none}
+.spinner{display:inline-block;width:18px;height:18px;border:3px solid transparent;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.role-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem}
+.role-option{border:2px solid var(--border);border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:all .15s}
+.role-option:hover{border-color:var(--text2)}
+.role-option.selected{border-color:var(--accent);background:var(--bg3)}
+.role-option .ro-icon{font-size:2rem;margin-bottom:4px}
+.role-option .ro-title{font-weight:700;font-size:.85rem;margin-bottom:2px}
+.role-option .ro-desc{font-size:.72rem;color:var(--text2)}
+.badge-info{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--text2);margin-bottom:1rem;text-align:center}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"></div>
+  <h1>إنشاء حساب</h1>
+  <p class="desc">اختر دورك — المالك ولا سواق؟</p>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="role-toggle">
+    <div class="role-option" id="optOwner" onclick="selectRole('owner')">
+      <div class="ro-icon"></div>
+      <div class="ro-title">مالك العربية</div>
+      <div class="ro-desc">بتشوف كل السواقين وإجمالي الأرباح</div>
+    </div>
+    <div class="role-option selected" id="optDriver" onclick="selectRole('driver')">
+      <div class="ro-icon"></div>
+      <div class="ro-title">سواق</div>
+      <div class="ro-desc">بتشوف مشاويرك ومصاريفك بس</div>
+    </div>
+  </div>
+
+  {% if not has_owner %}
+  <div class="badge-info"> أول مستخدم — هتكون المالك تلقائياً</div>
+  {% endif %}
+
+  <input type="hidden" id="role" value="{% if has_owner %}driver{% else %}owner{% endif %}">
+
+  <div class="form-group">
+    <label>اسم المستخدم</label>
+    <input type="text" id="username" placeholder="مثلاً: mohamed" autocomplete="username">
+  </div>
+  <div class="form-group">
+    <label>البريد الإلكتروني</label>
+    <input type="email" id="email" placeholder="example@email.com" autocomplete="email">
+  </div>
+  <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="form-group">
+      <label>كلمة السر (6+ حروف)</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label>تأكيد كلمة السر</label>
+      <input type="password" id="confirm" placeholder="••••••••" autocomplete="new-password">
+    </div>
+  </div>
+  <div class="form-group" id="splitGroup">
+    <label>نسبة السواق (%)</label>
+    <input type="number" id="splitPct" value="50" min="1" max="100">
+    <div style="font-size:.7rem;color:var(--text2);margin-top:2px">نصيبه من الإيرادات قبل خصم المصروفات</div>
+  </div>
+
+  <button class="btn btn-primary" onclick="register()" id="registerBtn"> إنشاء الحساب</button>
+  <div class="footer">
+    عندك حساب؟ <a href="/login">تسجيل دخول</a>
+  </div>
+</div>
+
+<style>
+.brand-links{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:1rem 0 1.25rem}
+.brand-link{border:2px solid var(--border);border-radius:10px;padding:10px;text-align:center;cursor:pointer;transition:all .15s;text-decoration:none;color:var(--text)}
+.brand-link:hover{border-color:var(--accent);background:var(--bg3);transform:translateY(-2px)}
+.brand-link .bl-icon{font-size:1.3rem;display:block;margin-bottom:2px}
+.brand-link .bl-name{font-size:.7rem;font-weight:600}
+</style>
+
+<div class="brand-links">
+  <a href="/register/uber" class="brand-link" style="border-color:#06C16744">
+    <span class="bl-icon" style="color:#06C167"></span>
+    <span class="bl-name">Uber</span>
+  </a>
+  <a href="/register/didi" class="brand-link" style="border-color:#FF6B3544">
+    <span class="bl-icon" style="color:#FF6B35"></span>
+    <span class="bl-name">Didi</span>
+  </a>
+  <a href="/register/indrive" class="brand-link" style="border-color:#E5393544">
+    <span class="bl-icon" style="color:#E53935"></span>
+    <span class="bl-name">InDrive</span>
+  </a>
+</div>
+
+<script>
+function selectRole(role) {
+  document.getElementById('role').value = role;
+  document.getElementById('optOwner').classList.toggle('selected', role==='owner');
+  document.getElementById('optDriver').classList.toggle('selected', role==='driver');
+  const sg = document.getElementById('splitGroup');
+  sg.style.display = role === 'driver' ? 'block' : 'none';
+}
+
+{% if has_owner %}
+// First user exists, default to driver
+selectRole('driver');
+{% endif %}
+
+async function register() {
+  const role = document.getElementById('role').value;
+  const username = document.getElementById('username').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const confirm = document.getElementById('confirm').value;
+  const splitPct = document.getElementById('splitPct').value;
+  const errorEl = document.getElementById('errorMsg');
+  const btn = document.getElementById('registerBtn');
+
+  if(!username || !email || !password){errorEl.textContent='املأ كل الحقول';errorEl.style.display='block';return}
+  if(password.length<6){errorEl.textContent='كلمة السر قصيرة (6 حروف)';errorEl.style.display='block';return}
+  if(password!==confirm){errorEl.textContent='كلمة السر غير متطابقة';errorEl.style.display='block';return}
+
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> جاري إنشاء الحساب...';
+  errorEl.style.display='none';
+  try {
+    const r = await fetch('/api/auth/register', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username, email, password, role, driver_split_pct: parseFloat(splitPct)})
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.detail||d.message||'خطأ');
+    window.location.href = '/';
+  } catch(e) {
+    errorEl.textContent = e.message; errorEl.style.display='block';
+    btn.disabled=false; btn.innerHTML=' إنشاء الحساب';
+  }
+}
+document.addEventListener('keydown', e => {if(e.key==='Enter') register()});
+</script>
+</body>
+</html>

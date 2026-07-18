@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Driver Dashboard</title>
+<style>
+:root{--bg:#000;--bg-card:#1c1c1e;--bg-raised:#2a2a2d;--text-title:#fff;--text-body:#f5f5f7;--text-muted:rgba(255,255,255,0.56);--text-faint:rgba(255,255,255,0.32);--accent:#0071e3;--accent-soft:rgba(0,113,227,0.12);--green:#30d158;--green-soft:rgba(48,209,88,0.12);--red:#ff453a;--red-soft:rgba(255,69,58,0.12);--border:rgba(255,255,255,0.08);--radius-sm:6px;--radius:8px;--radius-lg:12px;--radius-xl:14px;--radius-pill:980px;--font:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;-webkit-font-smoothing:antialiased;letter-spacing:-.015em}
+body{font-family:var(--font);background:var(--bg);color:var(--text-body);min-height:100vh;display:flex;align-items:center;justify-content:center;direction:{{ dir }};padding:16px}
+.card{background:var(--bg-card);border-radius:var(--radius-xl);padding:2.5rem 2rem 2rem;width:380px;max-width:100%;text-align:center}
+.logo-wrap{width:44px;height:44px;border-radius:var(--radius);background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.logo-wrap svg{width:22px;height:22px;color:#fff}
+h1{font-size:1.2rem;font-weight:600;color:var(--text-title);letter-spacing:-.02em;margin-bottom:3px}
+.desc{font-size:.76rem;color:var(--text-faint);margin-bottom:1.5rem}
+.fg{margin-bottom:14px;text-align:{% if dir=='rtl' %}right{% else %}left{% endif %}}
+.fg label{display:block;margin-bottom:4px;color:var(--text-faint);font-size:.72rem;font-weight:500}
+input{background:#111;border:1px solid var(--border);color:var(--text-body);padding:10px 14px;border-radius:var(--radius);width:100%;font-family:var(--font);font-size:.82rem;outline:none;transition:border-color .15s}
+input:focus{border-color:var(--accent)}
+.btn{width:100%;padding:11px;border-radius:var(--radius-pill);border:none;background:var(--accent);color:#fff;font-size:.82rem;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .15s;margin-top:4px}
+.btn:hover{background:#0077ed;opacity:.9}
+.btn:disabled{opacity:.5;cursor:default}
+.ermsg{background:var(--red-soft);color:var(--red);font-size:.74rem;padding:8px 12px;border-radius:var(--radius);margin-bottom:12px;display:none}
+.rs{display:flex;gap:8px;margin-bottom:14px}
+.ro{flex:1;padding:9px;border:1px solid var(--border);border-radius:var(--radius-pill);text-align:center;cursor:pointer;font-size:.74rem;transition:all .15s;background:transparent;color:var(--text-faint)}
+.ro.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:500}
+.ro.o.active{border-color:var(--green);background:var(--green-soft);color:var(--green)}
+.plate-hint{font-size:.7rem;color:var(--text-faint);margin-top:-10px;margin-bottom:14px}
+.ft{font-size:.6rem;color:var(--text-faint);margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg></div>
+  <h1>Driver Dashboard</h1>
+  <p class="desc" id="descText">تابع أرباحك عبر كل المنصات</p>
+
+  <div class="ermsg" id="errMsg"></div>
+
+  <div class="rs">
+    <div class="ro active" id="rD" onclick="setR('driver')">سواق</div>
+    <div class="ro o" id="rO" onclick="setR('owner')">صاحب عربية</div>
+  </div>
+
+  <div class="fg" id="phoneRow">
+    <label id="lblPhone">رقم الموبايل</label>
+    <input type="tel" id="phone" inputmode="numeric" placeholder="0100xxxxxxx">
+  </div>
+
+  <div class="fg" id="plateRow" style="display:none">
+    <label>رقم العربية (حروف + أرقام)</label>
+    <input type="text" id="plate" placeholder="مثال: س ج د 1234">
+  </div>
+
+  <button class="btn" id="loginBtn" onclick="doLogin()">دخول</button>
+
+  <div class="ft">حلل أرباحك عبر كل المنصات في مكان واحد</div>
+</div>
+
+<script>
+let role = 'driver';
+
+function setR(v) {
+  role = v;
+  document.querySelectorAll('.ro').forEach(e => e.classList.remove('active'));
+  document.getElementById('r' + (v === 'driver' ? 'D' : 'O')).classList.add('active');
+  document.getElementById('plateRow').style.display = v === 'owner' ? 'block' : 'none';
+  document.getElementById('lblPhone').textContent = v === 'owner' ? 'رقم التلفون' : 'رقم الموبايل';
+  document.getElementById('descText').textContent = v === 'owner'
+    ? 'ادخل رقم العربية والتلفون'
+    : 'ادخل رقمك عشان تدخل — المالك يضيفك الأول';
+}
+
+async function doLogin() {
+  const phone = document.getElementById('phone').value.trim();
+  if (!phone || phone.length < 10) { showE('ادخل رقم موبايل صحيح'); return; }
+
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+
+  try {
+    if (role === 'owner') {
+      const plate = document.getElementById('plate').value.trim().toUpperCase();
+      if (!plate) { showE('ادخل رقم العربية'); btn.disabled = false; return; }
+      const r = await fetch('/api/auth/owner-login', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({plate, phone})
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'خطأ');
+      window.location.href = '/owner-dashboard';
+    } else {
+      // Driver: just phone, no password, no OTP
+      const r = await fetch('/api/auth/driver-login', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({phone})
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'خطأ');
+      window.location.href = '/driver-connect';
+    }
+  } catch(e) { showE(e.message); btn.disabled = false; }
+}
+
+function showE(m) {
+  const e = document.getElementById('errMsg');
+  e.textContent = m; e.style.display = 'block';
+  setTimeout(() => { e.style.display = 'none'; }, 5000);
+}
+</script>
+</body>
+</html>

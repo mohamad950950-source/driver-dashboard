@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ربط {{ platform|upper }} | Driver Dashboard</title>
+<style>
+/* Same dark theme as main app */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--green:#3fb950;--radius:12px;--font:system-ui,'Segoe UI',-apple-system,sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;direction:rtl}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:2rem;width:480px;max-width:95vw}
+.card h2{font-size:1.2rem;margin-bottom:6px;text-align:center}
+.card .desc{color:var(--text2);font-size:.85rem;text-align:center;margin-bottom:1.5rem;line-height:1.6}
+.logo{font-size:3rem;text-align:center;margin-bottom:1rem}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;margin-bottom:4px;color:var(--text2);font-size:.82rem;font-weight:500}
+input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;width:100%;font-family:inherit;font-size:.85rem}
+input:focus{outline:2px solid var(--accent);border-color:transparent}
+.btn{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;cursor:pointer;font-size:.85rem;font-family:inherit;width:100%;text-align:center}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{filter:brightness(1.2)}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.note{font-size:.75rem;color:var(--text2);text-align:center;margin-top:1rem;line-height:1.5}
+.success-msg{display:none;text-align:center;padding:1rem}
+.success-msg .check{font-size:3rem;margin-bottom:8px}
+.success-msg h3{color:var(--green);margin-bottom:4px}
+.spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card" id="connectCard">
+  <div class="logo" id="platLogo">{{ {'uber':'','didi':'','indrive':''}.get(platform,'') }}</div>
+  <h2>ربط حساب {{ platform|upper }}</h2>
+  <p class="desc">ادخل بيانات الحساب — النظام هيحاول يجيب المشاوير تلقائياً</p>
+  
+  <div id="authForm">
+    <div class="form-group">
+      <label>البريد الإلكتروني أو رقم التليفون</label>
+      <input type="text" id="email" placeholder="email@example.com">
+    </div>
+    <div class="form-group">
+      <label>كلمة المرور</label>
+      <input type="password" id="password" placeholder="كلمة المرور">
+    </div>
+    <button class="btn btn-primary" onclick="submitAuth()"> ربط الحساب</button>
+    <button class="btn" style="margin-top:8px" onclick="useAPIKey()">️ استخدم API Key بدلاً من ذلك</button>
+    
+    <div class="note">
+      ️ البيانات مش بتتخزن عندنا — بنستخدمها بس عشان نجيب الـ Access Token من {{ platform|upper }}<br>
+      في النسخة الكاملة: هتستخدم OAuth الرسمي بضغط زر واحدة
+    </div>
+  </div>
+
+  <div id="apiKeyForm" style="display:none">
+    <div class="form-group">
+      <label>API Key (من Developer Portal بتاع {{ platform|upper }})</label>
+      <input type="text" id="apikey" placeholder="ادخل API Key">
+    </div>
+    <div class="form-group">
+      <label>API Secret</label>
+      <input type="password" id="apisecret" placeholder="ادخل Secret">
+    </div>
+    <button class="btn btn-green" onclick="submitAPIKey()"> حفظ API Key</button>
+    <button class="btn" style="margin-top:8px" onclick="usePassword()"> استخدام البريد/كلمة السر</button>
+  </div>
+
+  <div class="success-msg" id="successMsg">
+    <div class="check"></div>
+    <h3>تم ربط الحساب بنجاح!</h3>
+    <p style="color:var(--text2);font-size:.85rem;margin-bottom:1rem">تقدر دلوقتي تسحب المشاوير من صفحة الحسابات</p>
+    <button class="btn btn-primary" onclick="window.close()"> إغلاق</button>
+  </div>
+</div>
+
+<script>
+function useAPIKey() {
+  document.getElementById('authForm').style.display = 'none';
+  document.getElementById('apiKeyForm').style.display = 'block';
+}
+function usePassword() {
+  document.getElementById('apiKeyForm').style.display = 'none';
+  document.getElementById('authForm').style.display = 'block';
+}
+
+async function submitAuth() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if (!email || !password) { alert('ادخل البريد وكلمة السر'); return; }
+
+  const btn = document.querySelector('#authForm .btn-primary');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> جاري الربط...';
+
+  try {
+    const r = await fetch('/api/oauth/{{ platform }}/callback', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        email: email,
+        token_type: 'password_auth',
+        status: 'connected',
+        note: 'تم الربط يدوياً — في الانتظار لتأكيد الـ API'
+      })
+    });
+    const data = await r.json();
+    document.getElementById('authForm').style.display = 'none';
+    document.getElementById('successMsg').style.display = 'block';
+  } catch(e) {
+    alert('خطأ: ' + e.message);
+    btn.disabled = false; btn.innerHTML = ' ربط الحساب';
+  }
+}
+
+async function submitAPIKey() {
+  const key = document.getElementById('apikey').value.trim();
+  const secret = document.getElementById('apisecret').value;
+  if (!key) { alert('ادخل API Key'); return; }
+
+  const btn = document.querySelector('#apiKeyForm .btn-green');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> جاري الحفظ...';
+
+  try {
+    const r = await fetch('/api/oauth/{{ platform }}/callback', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        api_key: key,
+        api_secret: secret,
+        token_type: 'api_key',
+        status: 'connected'
+      })
+    });
+    const data = await r.json();
+    document.getElementById('apiKeyForm').style.display = 'none';
+    document.getElementById('successMsg').style.display = 'block';
+  } catch(e) {
+    alert('خطأ: ' + e.message);
+    btn.disabled = false; btn.innerHTML = ' حفظ API Key';
+  }
+}
+</script>
+</body>
+</html>

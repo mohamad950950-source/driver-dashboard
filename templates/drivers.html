@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.d-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-bottom:1.25rem}
+.dc{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem;display:flex;align-items:center;gap:12px;transition:border-color .18s}
+.dc:hover{border-color:var(--accent)}
+.dc .dc-av{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:var(--accent);flex-shrink:0}
+.dc .dc-info{flex:1;min-width:0}
+.dc .dc-name{font-weight:600;font-size:.85rem;color:var(--text-title);margin-bottom:2px}
+.dc .dc-phone{font-size:.7rem;color:var(--text-faint)}
+.dc .dc-car{font-size:.68rem;color:var(--text-muted);padding:2px 8px;background:var(--bg-raised);border-radius:var(--radius-sm);display:inline-block;margin-top:4px}
+.dc .dc-empty{font-size:.68rem;color:var(--text-faint);font-style:italic}
+.dc .dc-actions{display:flex;gap:6px;flex-shrink:0}
+.dc .dc-actions button{width:28px;height:28px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.65rem;transition:all .12s}
+.dc .dc-actions .edit-btn{background:var(--accent-soft);color:var(--accent)}
+.dc .dc-actions .edit-btn:hover{background:var(--accent);color:#fff}
+.dc .dc-actions .del-btn{background:rgba(255,69,88,0.1);color:var(--red)}
+.dc .dc-actions .del-btn:hover{background:var(--red);color:#fff}
+.action-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.action-bar .btn{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-pill);border:none;font-size:.78rem;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .15s}
+.action-bar .btn-primary{background:var(--accent);color:#fff}
+.action-bar .btn-primary:hover{opacity:.9}
+</style>
+
+<div class="pg-hdr"><h1>{{ _('السواقين') }}</h1></div>
+
+<div class="action-bar">
+  <button class="btn btn-primary" onclick="showAddDriver()">+ {{ _('اضافة سواق') }}</button>
+</div>
+
+<div class="d-grid" id="driverGrid"></div>
+
+<!-- Add Driver Modal -->
+<div class="mo" id="addDriverModal">
+  <div class="m">
+    <h2 id="modalTitle">{{ _('اضافة سواق جديد') }}</h2>
+    <div class="fg">
+      <label>{{ _('اسم السواق') }}</label>
+      <input type="text" id="drvName" placeholder="{{ _('الاسم كامل') }}">
+    </div>
+    <div class="fg">
+      <label>{{ _('رقم التلفون') }}</label>
+      <input type="tel" id="drvPhone" placeholder="0100xxxxxxx" dir="ltr">
+    </div>
+    <div class="fg">
+      <label>{{ _('العربية (اختياري)') }}</label>
+      <select id="drvCar"></select>
+    </div>
+    <div class="ma">
+      <button class="btn btn-secondary" onclick="closeModal('addDriverModal')">{{ _('الغاء') }}</button>
+      <button class="btn btn-primary" id="modalSaveBtn" onclick="addDriver()">{{ _('اضافة') }}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let editingDriverId = null;
+
+async function loadDrivers(){
+  const g=document.getElementById('driverGrid');g.innerHTML='<div class="es"><h3>{{ _('تحميل...') }}</h3></div>';
+  try{
+    const r=await api('/api/owner/drivers-list');
+    g.innerHTML='';
+    (r.drivers||[]).forEach(d=>{
+      const name=d.display_name||d.username||d.phone||d.mobile||'';
+      const initial=(name.charAt(0)||'?').toUpperCase();
+      const carInfo=d.car_name ? (d.car_name+(d.plate_number?' ('+d.plate_number+')':'')) : '';
+      g.innerHTML+='<div class="dc"><div class="dc-av">'+initial+'</div><div class="dc-info"><div class="dc-name">'+name+'</div><div class="dc-phone">'+d.phone+'</div>'+
+        (carInfo ? '<div class="dc-car">'+carInfo+'</div>' : '<div class="dc-empty">{{ _('لا توجد عربية') }}</div>')+'</div>'+
+        '<div class="dc-actions"><button class="edit-btn" onclick="showEditDriver('+d.id+',\''+name.replace(/'/g,"\\'")+'\',\''+(d.phone||'')+'\')" title="{{ _('تعديل') }}">&#9998;</button>'+
+        '<button class="del-btn" onclick="deleteDriver('+d.id+',\''+name.replace(/'/g,"\\'")+'\')" title="{{ _('حذف') }}">&#10005;</button></div></div>';
+    });
+    if(!r.drivers||!r.drivers.length) g.innerHTML='<div class="es"><h3>{{ _('لا يوجد سواقين') }}</h3><p>{{ _('اضف سواق جديد') }}</p></div>';
+    // Populate car dropdown
+    const sel=document.getElementById('drvCar');
+    try{
+      const cr=await api('/api/owner/cars');
+      sel.innerHTML='<option value="">{{ _('بدون ربط') }}</option>';
+      (cr.cars||[]).filter(c=>!c.driver_id).forEach(c=>{
+        sel.innerHTML+='<option value="'+c.car_id+'">'+(c.car_name||'')+' '+(c.plate_number||'')+'</option>';
+      });
+    }catch(e){sel.innerHTML='<option value="">{{ _('بدون ربط') }}</option>'}
+  }catch(e){document.getElementById('driverGrid').innerHTML='<div class="es"><h3>{{ _('خطأ') }}</h3><p>'+e.message+'</p></div>'}
+}
+
+function showAddDriver(){
+  editingDriverId = null;
+  document.getElementById('modalTitle').textContent = '{{ _('اضافة سواق جديد') }}';
+  document.getElementById('modalSaveBtn').textContent = '{{ _('اضافة') }}';
+  document.getElementById('drvName').value='';
+  document.getElementById('drvPhone').value='';
+  openModal('addDriverModal');
+}
+
+function showEditDriver(id, name, phone){
+  editingDriverId = id;
+  document.getElementById('modalTitle').textContent = '{{ _('تعديل السواق') }}';
+  document.getElementById('modalSaveBtn').textContent = '{{ _('حفظ') }}';
+  document.getElementById('drvName').value = name;
+  document.getElementById('drvPhone').value = phone;
+  openModal('addDriverModal');
+}
+
+async function addDriver(){
+  const name=document.getElementById('drvName').value.trim();
+  const phone=document.getElementById('drvPhone').value.trim();
+  if(!name||!phone){toast('{{ _('ادخل الاسم ورقم التلفون') }}','var(--red)');return}
+  try{
+    if(editingDriverId){
+      const r=await api('/api/owner/drivers/'+editingDriverId,{method:'PUT',body:JSON.stringify({name,phone})});
+      toast(r.message||'{{ _('تم التحديث') }}');
+    } else {
+      const carId=document.getElementById('drvCar').value;
+      const r=await api('/api/owner/add-driver',{method:'POST',body:JSON.stringify({name,phone,car_id:carId||null})});
+      toast(r.message||'{{ _('تمت الاضافة') }}');
+    }
+    closeModal('addDriverModal');
+    loadDrivers();
+  }catch(e){toast(e.message,'var(--red)')}
+}
+
+async function deleteDriver(id, name){
+  if(!confirm('{{ _('حذف') }} '+name+'? {{ _('هذه العملية لا يمكن التراجع عنها') }}')) return;
+  try{
+    const r=await api('/api/owner/drivers/'+id,{method:'DELETE'});
+    toast(r.message||'{{ _('تم الحذف') }}');
+    loadDrivers();
+  }catch(e){toast(e.message,'var(--red)')}
+}
+
+document.addEventListener('DOMContentLoaded',loadDrivers);
+</script>
+{% endblock %}

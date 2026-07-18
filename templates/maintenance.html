@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header">
+  <h1>{{ _('الصيانة') }}</h1>
+  <div class="header-left">
+    <button class="btn btn-primary" onclick="openModal('maintModal')">{{ _('إضافة صيانة') }}</button>
+    <select class="period-select" id="daysFilter" onchange="loadMaintenance()">
+      <option value="30">{{ _('آخر 30 يوم') }}</option>
+      <option value="90">{{ _('آخر 3 شهور') }}</option>
+      <option value="365" selected>{{ _('آخر سنة') }}</option>
+    </select>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="label">{{ _('إجمالي الصيانة') }}</div><div class="value" id="totalMaint" style="color:var(--purple)">—</div></div>
+  <div class="card"><div class="label">{{ _('عدد مرات الصيانة') }}</div><div class="value" id="maintCount">—</div></div>
+  <div class="card"><div class="label">{{ _('متوسط التكلفة') }}</div><div class="value" id="avgMaint">—</div></div>
+  <div class="card"><div class="label">{{ _('آخر صيانة') }}</div><div class="value" id="lastMaint" style="font-size:1rem;color:var(--orange)">—</div></div>
+</div>
+
+<div class="table-wrap">
+  <table><thead><tr>
+    <th>{{ _('النوع') }}</th><th>{{ _('الوصف') }}</th><th>{{ _('التكلفة') }}</th><th>{{ _('على حساب') }}</th><th>{{ _('الورشة') }}</th><th>{{ _('العداد') }}</th><th></th>
+  </tr></thead><tbody id="maintTable"></tbody></table>
+</div>
+<div class="empty-state" id="maintEmpty"><div class="icon"></div><h3>{{ _('لا توجد صيانات') }}</h3></div>
+
+<div class="modal-overlay" id="maintModal">
+  <div class="modal">
+    <h2>{{ _('إضافة صيانة') }}</h2>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('النوع') }} *</label>
+        <select id="maintType">
+          <option value="تغيير زيت">{{ _('تغيير زيت') }}</option>
+          <option value="إطارات">{{ _('إطارات') }}</option>
+          <option value="فرامل">{{ _('فرامل') }}</option>
+          <option value="بطارية">{{ _('بطارية') }}</option>
+          <option value="تكييف">{{ _('تكييف') }}</option>
+          <option value="سمكرة">{{ _('سمكرة') }}</option>
+          <option value="دهان">{{ _('دهان') }}</option>
+          <option value="كهرباء">{{ _('كهرباء') }}</option>
+          <option value="عفشة">{{ _('عفشة') }}</option>
+          <option value="دوري">{{ _('دوري') }}</option>
+          <option value="أخرى">{{ _('أخرى') }}</option>
+        </select>
+      </div>
+      <div class="form-group"><label>{{ _('التاريخ') }} *</label><input type="date" id="maintDate"></div>
+    </div>
+    <div class="form-group"><label>{{ _('التكلفة') }} *</label><input type="number" id="maintCost" step="0.01" min="0"></div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('الوصف') }}</label><input type="text" id="maintDesc"></div>
+      <div class="form-group"><label>{{ _('الورشة') }}</label><input type="text" id="maintShop"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('قراءة العداد (كم)') }}</label><input type="number" id="maintOdometer"></div>
+      <div class="form-group"><label>{{ _('الصيانة القادمة (كم)') }}</label><input type="number" id="maintNextKm"></div>
+    </div>
+    <div class="form-group"><label>{{ _('تاريخ الصيانة القادمة') }}</label><input type="date" id="maintNextDate"></div>
+    <div class="form-group"><label>{{ _('ملاحظات') }}</label><input type="text" id="maintNotes"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('maintModal')">{{ _('إلغاء') }}</button>
+      <button class="btn btn-primary" onclick="addMaintenance()">{{ _('حفظ') }}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function addMaintenance() {
+  const data = {
+    date: document.getElementById('maintDate').value,
+    type: document.getElementById('maintType').value,
+    cost: parseFloat(document.getElementById('maintCost').value)||0,
+    description: document.getElementById('maintDesc').value,
+    shop_name: document.getElementById('maintShop').value,
+    odometer_km: parseInt(document.getElementById('maintOdometer').value)||null,
+    next_service_km: parseInt(document.getElementById('maintNextKm').value)||null,
+    next_service_date: document.getElementById('maintNextDate').value,
+    notes: document.getElementById('maintNotes').value,
+  };
+  if(!data.cost){toast('{{ _('الرجاء إدخال التكلفة') }}','var(--red)');return}
+  await api('/api/maintenance',{method:'POST',body:JSON.stringify(data)});
+  toast('{{ _('تمت الإضافة') }}');
+  closeModal('maintModal');
+  loadMaintenance();
+  document.getElementById('maintCost').value='';
+  document.getElementById('maintDesc').value='';
+  document.getElementById('maintShop').value='';
+  document.getElementById('maintOdometer').value='';
+  document.getElementById('maintNextKm').value='';
+  document.getElementById('maintNextDate').value='';
+  document.getElementById('maintNotes').value='';
+}
+
+async function deleteMaint(id) {
+  if(!confirm('{{ _('حذف سجل الصيانة؟') }}')) return;
+  await api(`/api/maintenance/${id}`,{method:'DELETE'});
+  toast('{{ _('تم الحذف') }}');
+  loadMaintenance();
+}
+
+async function loadMaintenance() {
+  const days = document.getElementById('daysFilter').value;
+  const r = await api(`/api/maintenance?days=${days}`);
+  const t = document.getElementById('maintTable');
+  const e = document.getElementById('maintEmpty');
+
+  let total=0, count=r.data.length;
+  t.innerHTML = '';
+  if(count===0){e.style.display='block';} else {e.style.display='none';
+    r.data.forEach(x => {
+      total+=x.cost;
+      t.innerHTML += `<tr>
+        <td>${x.date}</td>
+        <td><span class="platform-tag" style="background:var(--bg3);color:var(--purple);border:1px solid var(--purple)">${x.type}</span></td>
+        <td class="text-muted">${x.description||'—'}</td>
+        <td style="color:var(--red);font-weight:600">${fmt(x.cost)} {{ _('ج.م') }}</td>
+        <td>${x.first_time_free ? '{{ _('مجاني أول مرة') }}' : x.borne_by === 'driver' ? '{{ _('السواق') }}' : '{{ _('المالك') }}'}</td>
+        <td class="text-muted">${x.shop_name||'—'}</td>
+        <td class="text-muted">${x.odometer_km?x.odometer_km.toLocaleString()+' {{ _('كم') }}':'—'}</td>
+        <td><button class="btn btn-sm btn-icon" onclick="deleteMaint(${x.id})">{{ _('حذف') }}</button></td>
+      </tr>`;
+    });
+  }
+  document.getElementById('totalMaint').textContent = fmt(total) + ' {{ _('ج.م') }}';
+  document.getElementById('maintCount').textContent = count;
+  document.getElementById('avgMaint').textContent = count>0 ? fmt(total/count) + ' {{ _('ج.م') }}' : '—';
+  document.getElementById('lastMaint').textContent = r.data[0] ? r.data[0].date + ' - ' + r.data[0].type : '—';
+}
+
+document.getElementById('maintDate').value = new Date().toISOString().split('T')[0];
+document.addEventListener('DOMContentLoaded', loadMaintenance);
+</script>
+{% endblock %}

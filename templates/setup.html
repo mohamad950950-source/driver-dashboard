@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.setup-container{max-width:720px;margin:0 auto}
+.setup-step{display:none}
+.setup-step.active{display:block}
+.step-indicator{display:flex;gap:8px;margin-bottom:2rem;justify-content:center}
+.step-dot{width:36px;height:36px;border-radius:50%;background:var(--bg3);border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text2);font-weight:600}
+.step-dot.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.step-dot.done{background:var(--green);color:#fff;border-color:var(--green)}
+.setup-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:2rem}
+.setup-card h2{font-size:1.3rem;margin-bottom:6px}
+.setup-card .desc{color:var(--text2);font-size:.88rem;margin-bottom:1.5rem;line-height:1.6}
+.setup-card .big-icon{font-size:3.5rem;text-align:center;margin-bottom:1rem}
+.setup-card .form-group{margin-bottom:14px}
+.setup-card .form-group label{display:block;margin-bottom:4px;color:var(--text2);font-size:.82rem;font-weight:500}
+.setup-card .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.feature-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:1.5rem}
+.feature-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center}
+.feature-card .f-icon{font-size:2rem;margin-bottom:6px}
+.feature-card .f-title{font-weight:600;font-size:.85rem;margin-bottom:2px}
+.feature-card .f-desc{font-size:.72rem;color:var(--text2)}
+.setup-nav{display:flex;justify-content:space-between;margin-top:1.5rem;gap:12px}
+@media(max-width:600px){.feature-grid{grid-template-columns:1fr}.setup-card .form-row{grid-template-columns:1fr}}
+</style>
+
+<div class="setup-container">
+  <div class="step-indicator">
+    {% for s in range(1, 6) %}
+    <div class="step-dot {% if s == current_step %}active{% elif s < current_step %}done{% endif %}">{{s}}</div>
+    {% endfor %}
+  </div>
+
+  <div class="setup-card">
+    <!-- Step 1: Welcome -->
+    <div class="setup-step {% if current_step == 1 %}active{% endif %}" id="step1">
+      <div class="big-icon"></div>
+      <h2 style="text-align:center">أهلاً بك في Driver Dashboard!</h2>
+      <p class="desc" style="text-align:center">
+        تتبع أرباحك من <strong>Uber - Didi - InDrive - والشغل الشخصي</strong><br>
+        في لوحة واحدة — مع المصروفات والصيانة ونظام الشريك
+      </p>
+      <div class="feature-grid">
+        <div class="feature-card"><div class="f-icon"></div><div class="f-title">تتبع الإيرادات</div><div class="f-desc">أرباح كل platform + العمولات</div></div>
+        <div class="feature-card"><div class="f-icon"></div><div class="f-title">المصروفات</div><div class="f-desc">بنزين - زيت - غسيل - تأمين</div></div>
+        <div class="feature-card"><div class="f-icon"></div><div class="f-title">الصيانة</div><div class="f-desc">سجل صيانة + تذكير بالصيانة القادمة</div></div>
+        <div class="feature-card"><div class="f-icon"></div><div class="f-title">نظام الشريك</div><div class="f-desc">قسم الأرباح حسب النسبة</div></div>
+      </div>
+      <div class="setup-nav">
+        <div></div>
+        <button class="btn btn-primary" onclick="nextStep(2)">ابدأ ️</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Car Info -->
+    <div class="setup-step {% if current_step == 2 %}active{% endif %}" id="step2">
+      <div class="big-icon"></div>
+      <h2 style="text-align:center">معلومات العربية</h2>
+      <p class="desc" style="text-align:center">خلينا نعرف العربية اللي بتشتغل عليها</p>
+      <div class="form-group">
+        <label>اسم العربية (اختياري)</label>
+        <input type="text" id="sCarName" placeholder="مثلاً: هيونداي النترا 2022">
+      </div>
+      <div class="form-group">
+        <label>رقم اللوحة</label>
+        <input type="text" id="sPlate" placeholder="مثلاً: س ج ى 1234">
+      </div>
+      <div class="form-group">
+        <label>نوع الوقود</label>
+        <select id="sFuel">
+          <option value="بنزين 92">بنزين 92</option>
+          <option value="بنزين 95">بنزين 95</option>
+          <option value="سولار">سولار (ديزل)</option>
+          <option value="غاز">غاز طبيعي</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>سعر اللتر (ج.م)</label>
+          <input type="number" id="sFuelCost" step="0.01" value="13.5" placeholder="مثلاً 13.5">
+        </div>
+        <div class="form-group">
+          <label>كم/لتر (المعدل)</label>
+          <input type="number" id="sKmLiter" step="0.1" value="12" placeholder="مثلاً 12">
+        </div>
+      </div>
+      <div class="setup-nav">
+        <button class="btn" onclick="prevStep(1)">️ رجوع</button>
+        <button class="btn btn-primary" onclick="nextStep(3)">التالي ️</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Partner -->
+    <div class="setup-step {% if current_step == 3 %}active{% endif %}" id="step3">
+      <div class="big-icon"></div>
+      <h2 style="text-align:center">نظام الشريك</h2>
+      <p class="desc" style="text-align:center">لو العربية بينك وبين شريك، حدد النسبة — لو العربية ملكك لوحدك، خليها 0%</p>
+      <div style="max-width:300px;margin:0 auto 1.5rem">
+        <div class="form-group">
+          <label>نسبة الشريك (%) — يعني كام % من الإيرادات للشريك؟</label>
+          <input type="number" id="sPartner" min="0" max="100" value="50" step="1" style="text-align:center;font-size:1.5rem;font-weight:700">
+          <div style="text-align:center;margin-top:8px;font-size:.85rem">
+            <span style="color:var(--accent);font-weight:600">نصيبك: <span id="sYour">50</span>%</span>
+            &nbsp;|&nbsp;
+            <span style="color:var(--orange);font-weight:600">الشريك: <span id="sPartnerDisp">50</span>%</span>
+          </div>
+        </div>
+      </div>
+      <div class="setup-nav">
+        <button class="btn" onclick="prevStep(2)">️ رجوع</button>
+        <button class="btn btn-primary" onclick="nextStep(4)">التالي ️</button>
+      </div>
+    </div>
+
+    <!-- Step 4: First Trip -->
+    <div class="setup-step {% if current_step == 4 %}active{% endif %}" id="step4">
+      <div class="big-icon"></div>
+      <h2 style="text-align:center">أضف أول مشوار</h2>
+      <p class="desc" style="text-align:center">تقدر تتخطى الخطوة دي وتضيف مشاوير من الرئيسية بعدين، بس جرب تضيف أول مشوار عشان تشوف الشكل</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>المنصة</label>
+          <select id="sPlat">
+            <option value="uber">Uber</option>
+            <option value="didi">Didi</option>
+            <option value="indrive">InDrive</option>
+            <option value="personal">شخصي</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>التاريخ</label>
+          <input type="date" id="sDate">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>الأجرة</label>
+          <input type="number" id="sFare" step="0.01" min="0" placeholder="مثلاً 85">
+        </div>
+        <div class="form-group">
+          <label>عمولة المنصة</label>
+          <input type="number" id="sComm" step="0.01" min="0" value="0">
+        </div>
+      </div>
+      <div style="text-align:center;margin:1rem 0">
+        <button class="btn" onclick="addFirstTrip()"> أضف المشوار</button>
+      </div>
+      <div class="setup-nav">
+        <button class="btn" onclick="prevStep(3)">️ رجوع</button>
+        <button class="btn btn-primary" onclick="nextStep(5)">تخطي ️</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Done -->
+    <div class="setup-step {% if current_step == 5 %}active{% endif %}" id="step5">
+      <div class="big-icon"></div>
+      <h2 style="text-align:center">كل شئ جاهز!</h2>
+      <p class="desc" style="text-align:center">
+        خلصنا الإعدادات الأولية <br>
+        دلوقتي تقدر تبدأ تدخل مشاويرك وتتتبع أرباحك
+      </p>
+      <div class="feature-grid">
+        <div class="feature-card"><div class="f-icon"></div><div class="f-title">الرئيسية</div><div class="f-desc">نظرة عامة على الأرباح والمصروفات</div></div>
+        <div class="feature-card"><div class="f-icon"></div><div class="f-title">المشاوير</div><div class="f-desc">إدارة كل مشاويرك</div></div>
+        <div class="feature-card"><div class="f-icon"></div><div class="f-title">المصروفات</div><div class="f-desc">تتبع البنزين والصيانة</div></div>
+        <div class="feature-card"><div class="f-icon"></div><div class="f-title">الصيانة</div><div class="f-desc">سجل الصيانات وجدولها</div></div>
+      </div>
+      <div style="text-align:center">
+        <a href="/" class="btn btn-primary" style="font-size:1.1rem;padding:12px 40px"> ابدأ دلوقتي</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let stepData = {};
+
+function nextStep(n) {
+  // Save current step data
+  if (n === 3) {
+    // Step 2 -> 3: save car data
+    stepData.car_name = document.getElementById('sCarName').value;
+    stepData.plate_number = document.getElementById('sPlate').value;
+    stepData.fuel_type = document.getElementById('sFuel').value;
+    stepData.fuel_cost_per_liter = document.getElementById('sFuelCost').value;
+    stepData.km_per_liter = document.getElementById('sKmLiter').value;
+  }
+  if (n === 4) {
+    // Step 3 -> 4: save partner share
+    stepData.partner_share_pct = document.getElementById('sPartner').value;
+  }
+  document.getElementById('step' + (n-1)).classList.remove('active');
+  document.getElementById('step' + n).classList.add('active');
+  document.querySelectorAll('.step-dot')[n-2].classList.remove('active');
+  document.querySelectorAll('.step-dot')[n-2].classList.add('done');
+  document.querySelectorAll('.step-dot')[n-1].classList.add('active');
+
+  if (n === 5) {
+    // Save all settings to backend
+    saveAllSettings();
+  }
+}
+
+function prevStep(n) {
+  document.getElementById('step' + (n+1)).classList.remove('active');
+  document.getElementById('step' + n).classList.add('active');
+  document.querySelectorAll('.step-dot')[n].classList.remove('active');
+  document.querySelectorAll('.step-dot')[n].classList.add('active');
+  document.querySelectorAll('.step-dot')[n-1].classList.remove('done');
+}
+
+// Partner slider live update
+document.addEventListener('DOMContentLoaded', function() {
+  const partnerInput = document.getElementById('sPartner');
+  if (partnerInput) {
+    partnerInput.addEventListener('input', function() {
+      const p = parseInt(this.value) || 0;
+      document.getElementById('sYour').textContent = 100 - p;
+      document.getElementById('sPartnerDisp').textContent = p;
+    });
+  }
+  document.getElementById('sDate').value = new Date().toISOString().split('T')[0];
+});
+
+async function addFirstTrip() {
+  const data = {
+    platform: document.getElementById('sPlat').value,
+    date: document.getElementById('sDate').value,
+    fare: parseFloat(document.getElementById('sFare').value) || 0,
+    commission: parseFloat(document.getElementById('sComm').value) || 0,
+    tip: 0,
+    distance_km: 0,
+    start_time: '',
+    end_time: '',
+    notes: 'أول مشوار ',
+  };
+  if (!data.fare) { toast('ادخل الأجرة أولاً', 'var(--red)'); return; }
+  await api('/api/trips', {method: 'POST', body: JSON.stringify(data)});
+  toast(' أول مشوار اتحط!');
+  document.getElementById('sFare').value = '';
+  document.getElementById('sComm').value = '0';
+}
+
+async function saveAllSettings() {
+  // Save car info
+  await api('/api/car-settings', {method: 'POST', body: JSON.stringify(stepData)});
+  // Mark setup as complete
+  await api('/api/car-settings', {method: 'POST', body: JSON.stringify({setup_complete: 'true'})});
+}
+</script>
+{% endblock %}

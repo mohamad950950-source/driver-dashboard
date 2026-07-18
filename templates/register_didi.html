@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>انضم — Didi | Driver Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0d0d;--orange:#FF6B35;--orange2:#e85d2c;--gray:#1a1a1a;--text:#fff;--text2:#999;--radius:12px;--font:system-ui,sans-serif}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;direction:rtl;background-image:radial-gradient(circle at 80% 20%, #FF6B3508 0%, #0d0d0d 50%)}
+.card{background:var(--gray);border-radius:var(--radius);padding:2rem;width:440px;max-width:94vw;position:relative;overflow:hidden;border:1px solid #222}
+.card::before{content:'';position:absolute;top:0;right:0;width:100%;height:4px;background:linear-gradient(90deg,var(--orange),#FF8C42)}
+.brand{text-align:center;margin-bottom:.75rem}.brand .name{font-size:2rem;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,var(--orange),#FF8C42);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+h1{text-align:center;font-size:1.1rem;margin-bottom:4px}
+.desc{text-align:center;color:var(--text2);font-size:.78rem;margin-bottom:1rem}
+.plate-section{background:#222;border:1px solid #333;border-radius:10px;padding:1rem;margin-bottom:1rem}
+.plate-section .ps-title{font-size:.78rem;color:var(--orange);font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.plate-row{display:flex;gap:6px;align-items:center}
+.plate-row .letter-field{width:56px;text-align:center;text-transform:uppercase;font-weight:700;font-size:1.1rem}
+.plate-row .num-field{flex:1;text-align:center;font-weight:700;font-size:1.1rem}
+.plate-row .sep{color:var(--text2);font-size:1.2rem}
+.form-group{margin-bottom:10px}
+.form-group label{display:block;margin-bottom:3px;color:var(--text2);font-size:.75rem}
+input,select{background:#222;border:1px solid #333;color:var(--text);padding:10px 12px;border-radius:8px;width:100%;font-family:inherit;font-size:.85rem;transition:all .15s}
+input:focus,select:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 2px #FF6B3522}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:block;width:100%;padding:12px;border-radius:8px;border:none;font-family:inherit;font-size:.88rem;font-weight:600;cursor:pointer;text-align:center;background:linear-gradient(135deg,var(--orange),#FF8C42);color:#fff;transition:all .15s}
+.btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-outline{background:transparent;border:1px solid #333;color:var(--text2);font-size:.75rem;margin-top:6px}
+.verify-btn{background:#222;border:2px dashed #555;color:var(--text2);font-size:.78rem;padding:10px;border-radius:8px;cursor:pointer;text-align:center;margin-bottom:10px;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.verify-btn:hover{border-color:var(--orange);color:var(--orange);background:#FF6B3511}
+.footer{text-align:center;margin-top:1rem;font-size:.74rem;color:var(--text2)}
+.footer a{color:var(--orange);text-decoration:none}
+.error-msg{background:#f8514944;border:1px solid #f85149;color:#f85149;padding:8px 12px;border-radius:8px;font-size:.76rem;margin-bottom:8px;display:none}
+.success-msg{background:#3fb95044;border:1px solid #3fb950;color:#3fb950;padding:8px 12px;border-radius:8px;font-size:.76rem;margin-bottom:8px;display:none}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid transparent;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.plate-inst{font-size:.7rem;color:var(--text2);text-align:center;margin-top:4px;line-height:1.4}
+.doc-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:8px 0}
+.doc-box{background:#222;border:2px dashed #444;border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .2s}
+.doc-box:hover{border-color:#FF6B35;background:#FF6B3511}
+.doc-box .doc-icon{font-size:1.3rem;display:block;margin-bottom:3px}
+.doc-box .doc-label{font-size:.7rem;color:var(--text2)}
+.doc-box .doc-preview{max-height:60px;border-radius:6px;margin-top:6px;border:1px solid #333;display:block;width:100%;object-fit:cover}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><div class="name">Didi</div></div>
+  <h1>تابع أرباحك على Didi</h1>
+  <p class="desc">سجل مشاويرك على Didi وحلل أرباحك ومصاريفك</p>
+
+  <div class="error-msg" id="errorMsg"></div>
+  <div class="success-msg" id="successMsg"></div>
+
+  <div class="plate-section">
+    <div class="ps-title"> رقم العربية (حروف + أرقام)</div>
+    <div class="plate-row">
+      <input class="letter-field" id="plate1" maxlength="1" placeholder="أ" oninput="autoNext(this,'plate2')">
+      <input class="letter-field" id="plate2" maxlength="1" placeholder="ب" oninput="autoNext(this,'plate3')">
+      <input class="letter-field" id="plate3" maxlength="1" placeholder="ج" oninput="autoNext(this,'plateNum')">
+      <span class="sep">|</span>
+      <input class="num-field" id="plateNum" type="number" placeholder="١٣٤٥" oninput="limitDigits(this,6)">
+    </div>
+    <div class="plate-inst">الحروف العربية (٣ حروف) + الأرقام (حتى ٦ أرقام)</div>
+  </div>
+
+  <!--  رفع المستندات للتوثيق -->
+  <div class="plate-section" style="margin-top:12px">
+    <div class="ps-title"> المستندات المطلوبة للتوثيق</div>
+    <div class="doc-grid">
+      <div class="doc-box" onclick="document.getElementById('dFileLicense').click()">
+        <div class="doc-icon"></div><div class="doc-label">رخصة القيادة</div>
+        <img id="dPreviewLicense" class="doc-preview" style="display:none">
+        <input type="file" id="dFileLicense" accept="image/*" capture="environment" style="display:none" onchange="previewDoc(this,'dPreviewLicense','license_photo')">
+      </div>
+      <div class="doc-box" onclick="document.getElementById('dFileCarReg').click()">
+        <div class="doc-icon"></div><div class="doc-label">رخصة السيارة</div>
+        <img id="dPreviewCarReg" class="doc-preview" style="display:none">
+        <input type="file" id="dFileCarReg" accept="image/*" capture="environment" style="display:none" onchange="previewDoc(this,'dPreviewCarReg','car_reg_photo')">
+      </div>
+      <div class="doc-box" onclick="document.getElementById('dFileNational').click()">
+        <div class="doc-icon"></div><div class="doc-label">الرقم القومي</div>
+        <img id="dPreviewNational" class="doc-preview" style="display:none">
+        <input type="file" id="dFileNational" accept="image/*" capture="environment" style="display:none" onchange="previewDoc(this,'dPreviewNational','national_id_photo')">
+      </div>
+    </div>
+    <div class="plate-inst">اضغط على كل مستند عشان تصوره</div>
+  </div>
+
+  <div class="form-group">
+    <label>المحافظة</label>
+    <select id="governorate">
+      <option value="">اختر المحافظة</option>
+      <option>القاهرة</option><option>الجيزة</option><option>الإسكندرية</option><option>الشرقية</option>
+      <option>الدقهلية</option><option>البحيرة</option><option>المنيا</option><option>القليوبية</option>
+      <option>سوهاج</option><option>الغربية</option><option>أسيوط</option><option>كفر الشيخ</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group"><label>رقم الموبايل</label><input type="tel" id="mobile" placeholder="٠١٠٠٠٠٠٠٠٠٠" dir="ltr" style="text-align:left"></div>
+    <div class="form-group"><label>الرقم القومي</label><input type="text" id="nationalId" placeholder="١٤ رقم" maxlength="14" dir="ltr" style="text-align:left"></div>
+  </div>
+
+  <button class="verify-btn" onclick="verifyCar()"> تحقق من نيابة المرور</button>
+
+  <div class="form-group"><label>اسم المستخدم</label><input type="text" id="username" placeholder="مثلاً: ahmed_didi"></div>
+  <div class="form-group"><label>البريد الإلكتروني</label><input type="email" id="email" placeholder="driver@email.com"></div>
+  <div class="form-row">
+    <div class="form-group"><label>كلمة السر</label><input type="password" id="password" placeholder="••••••••"></div>
+    <div class="form-group"><label>تأكيد</label><input type="password" id="confirm" placeholder="••••••••"></div>
+  </div>
+
+  <button class="btn" onclick="register()" id="registerBtn">انشاء حساب</button>
+  <div class="footer">عندك حساب؟ <a href="/login">تسجيل دخول</a></div>
+</div>
+<script>
+function autoNext(c,n){if(c.value.length>=c.maxLength)document.getElementById(n).focus()}
+function limitDigits(e,m){if(e.value.length>m)e.value=e.value.slice(0,m)}
+function getPlate(){return(document.getElementById('plate1').value+document.getElementById('plate2').value+document.getElementById('plate3').value+' '+document.getElementById('plateNum').value).trim().toUpperCase()}
+function verifyCar(){
+  const p=getPlate(),n=document.getElementById('nationalId').value.trim();
+  if(!p||p.length<4){showError('ادفع رقم العربية كامل');return}
+  if(!n||n.length<14){showError('الرقم القومي ١٤ رقم');return}
+  window.open('https://ppo.gov.eg/ppo/r/ppoportal/ppoportal/traffic','_blank','width=1200,height=800');
+  showSuccess(' تم فتح نيابة المرور — أكد البيانات');
+}
+function showError(m){document.getElementById('errorMsg').textContent=m;document.getElementById('errorMsg').style.display='block';document.getElementById('successMsg').style.display='none'}
+function showSuccess(m){document.getElementById('successMsg').textContent=m;document.getElementById('successMsg').style.display='block';document.getElementById('errorMsg').style.display='none'}
+let uploadedDocs={};function previewDoc(input,previewId,docType){const file=input.files[0];if(!file)return;const r=new FileReader();r.onload=function(e){document.getElementById(previewId).src=e.target.result;document.getElementById(previewId).style.display='block';uploadedDocs[docType]=file;const fd=new FormData();fd.append('doc_type',docType);fd.append('file',file);fetch('/api/upload-document',{method:'POST',body:fd}).catch(()=>{})};r.readAsDataURL(file)}
+async function register(){
+  const u=document.getElementById('username').value.trim(),e=document.getElementById('email').value.trim(),p=document.getElementById('password').value,c=document.getElementById('confirm').value;
+  const plate=getPlate(),mobile=document.getElementById('mobile').value.trim(),natId=document.getElementById('nationalId').value.trim(),gov=document.getElementById('governorate').value;
+  const err=document.getElementById('errorMsg'),btn=document.getElementById('registerBtn');
+  if(!u||!e||!p||!plate||!mobile||!natId||!gov){showError('املأ كل الحقول');return}
+  if(p.length<6){showError('كلمة السر قصيرة');return}
+  if(p!==c){showError('كلمة السر غير متطابقة');return}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> جاري...';
+  try{
+    const r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,email:e,password:p,role:'driver',driver_split_pct:50,plate_number:plate,mobile:mobile,national_id:natId,governorate:gov})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||'خطأ');window.location.href='/';
+  }catch(er){showError(er.message);btn.disabled=false;btn.innerHTML=' إنشاء حساب كسواق Didi';}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter')register()});
+</script>
+</body>
+</html>

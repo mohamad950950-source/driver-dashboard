@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ربط حساب Didi | Driver Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0d0d;--orange:#FF6B35;--orange2:#e85d2c;--gray:#1a1a1a;--text:#ffffff;--text2:#999;--radius:12px;--font:system-ui,-apple-system,sans-serif}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;direction:rtl;background-image:radial-gradient(circle at 80% 20%, #FF6B3508 0%, #0d0d0d 50%)}
+.card{background:var(--gray);border-radius:var(--radius);padding:2rem;width:420px;max-width:92vw;position:relative;overflow:hidden;border:1px solid #222}
+.card::before{content:'';position:absolute;top:0;right:0;width:100%;height:4px;background:linear-gradient(90deg,var(--orange),#FF8C42)}
+.brand{text-align:center;margin-bottom:1.25rem}
+.brand .name{font-size:2rem;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,var(--orange),#FF8C42);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.brand .sub{font-size:.78rem;color:var(--text2);margin-top:4px}
+.step-box{background:#222;border-radius:10px;padding:1rem;margin-bottom:1.25rem;border-right:3px solid var(--orange);font-size:.8rem;line-height:1.6}
+.step-box .sb-title{font-weight:700;color:var(--orange);margin-bottom:6px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;margin-bottom:4px;color:var(--text2);font-size:.78rem}
+input{background:#222;border:1px solid #333;color:var(--text);padding:11px 14px;border-radius:8px;width:100%;font-family:inherit;font-size:.85rem;transition:all .15s}
+input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 2px #FF6B3522}
+.btn{display:block;width:100%;padding:12px;border-radius:8px;border:none;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
+.btn-primary{background:linear-gradient(135deg,var(--orange),#FF8C42);color:#fff}.btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn-outline{background:#222;border:1px solid #333;color:var(--text2);font-size:.78rem;margin-top:8px}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.note-box{background:#FF6B3511;border:1px solid #FF6B3533;border-radius:8px;padding:10px;margin-top:1rem;font-size:.72rem;color:var(--text2);text-align:center;line-height:1.5}
+.success{display:none;text-align:center;padding:1rem}.success .icon{font-size:3rem;margin-bottom:8px}
+.success h3{color:var(--orange);margin-bottom:4px}
+.error-msg{background:#f8514944;border:1px solid #f85149;color:#f85149;padding:8px 12px;border-radius:8px;font-size:.78rem;margin-bottom:10px;display:none}
+.spinner{display:inline-block;width:18px;height:18px;border:3px solid transparent;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <div class="name">Didi</div>
+    <div class="sub">اربط حساب Didi عشان تجيب مشاويرك تلقائياً</div>
+  </div>
+  <div class="step-box">
+    <div class="sb-title">ازاي تجيب رحلاتك من Didi؟</div>
+    <strong>الطريقة ١ — CSV:</strong><br>
+    App السواق ← مركز الأرباح ← تصدير البيانات ← CSV ← ارفعه في صفحة الحسابات<br><br>
+    <strong>الطريقة ٢ — API:</strong><br>
+    روح لـ Didi Developer Portal ← سجل تطبيق ← خذ API Key
+  </div>
+  <div class="error-msg" id="errorMsg"></div>
+  <div id="authForm">
+    <div class="form-group">
+      <label>API Key من Didi Developer</label>
+      <input type="text" id="apiKey" placeholder="didi_api_key...">
+    </div>
+    <div class="form-group">
+      <label>API Secret</label>
+      <input type="password" id="apiSecret" placeholder="••••••••">
+    </div>
+    <button class="btn btn-primary" onclick="connect()">ربط حساب Didi</button>
+    <button class="btn btn-outline" onclick="skipAndUpload()">لا. هرفع CSV</button>
+  </div>
+  <div class="success" id="successMsg">
+    <div class="icon"></div><h3>تم ربط حساب Didi!</h3>
+    <p style="color:var(--text2);font-size:.85rem">تقدر تسحب المشاوير من صفحة الحسابات</p>
+    <br><button class="btn btn-primary" onclick="window.close()">إغلاق</button>
+  </div>
+  <div class="note-box">الـ API key مخزنة بشكل آمن.</div>
+</div>
+<script>
+async function connect(){
+  const key=document.getElementById('apiKey').value.trim();
+  const secret=document.getElementById('apiSecret').value;
+  const err=document.getElementById('errorMsg');
+  const btn=document.querySelector('.btn-primary');
+  if(!key){err.textContent='ادخل API Key';err.style.display='block';return}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> جاري الربط...';
+  try{
+    const r=await fetch('/api/oauth/didi/callback',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({api_key:key,api_secret:secret,token_type:'api_key',status:'connected'})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'خطأ');
+    document.getElementById('authForm').style.display='none';
+    document.getElementById('successMsg').style.display='block';
+    window.opener?.loadAll?.();
+    setTimeout(()=>window.close(),1500);
+  }catch(e){err.textContent=e.message;err.style.display='block';btn.disabled=false;btn.innerHTML='ربط حساب Didi';}
+}
+function skipAndUpload(){window.close();}
+document.addEventListener('keydown',e=>{if(e.key==='Enter')connect()});
+</script>
+</body>
+</html>

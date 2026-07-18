@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header">
+  <h1>{{ _('المشاوير') }}</h1>
+  <div class="header-left">
+    <button class="btn btn-primary" onclick="openModal('tripModal')">{{ _('إضافة مشوار') }}</button>
+    <select class="period-select" id="daysFilter" onchange="loadTrips()">
+      <option value="7">{{ _('آخر 7 أيام') }}</option>
+      <option value="30" selected>{{ _('آخر 30 يوم') }}</option>
+      <option value="90">{{ _('آخر 3 شهور') }}</option>
+      <option value="365">{{ _('آخر سنة') }}</option>
+    </select>
+    <select class="period-select" id="platformFilter" onchange="loadTrips()">
+      <option value="all">{{ _('كل المنصات') }}</option>
+      <option value="uber">Uber</option>
+      <option value="didi">Didi</option>
+      <option value="indrive">InDrive</option>
+      <option value="personal">{{ _('شخصي') }}</option>
+    </select>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="label">{{ _('إجمالي المشاوير') }}</div><div class="value" id="totalTrips">—</div></div>
+  <div class="card"><div class="label">{{ _('إجمالي الإيرادات') }}</div><div class="value" id="totalRevenue" style="color:var(--green)">—</div></div>
+  <div class="card"><div class="label">{{ _('إجمالي العمولات') }}</div><div class="value" id="totalCommissions" style="color:var(--red)">—</div></div>
+  <div class="card"><div class="label">{{ _('متوسط الأجرة') }}</div><div class="value" id="avgFare">—</div></div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>#</th><th>{{ _('التاريخ') }}</th><th>{{ _('المنصة') }}</th><th>{{ _('الوقت') }}</th><th>{{ _('الأجرة') }}</th><th>{{ _('بقشيش') }}</th><th>{{ _('عمولة') }}</th><th>{{ _('الصافي') }}</th><th>{{ _('المسافة') }}</th><th></th>
+    </tr></thead>
+    <tbody id="tripsTable"></tbody>
+  </table>
+</div>
+<div class="empty-state" id="tripsEmpty">
+  <div class="icon"></div>
+  <h3>{{ _('لا توجد مشاوير') }}</h3>
+  <p>{{ _('أضف أول مشوار بالضغط على إضافة مشوار') }}</p>
+</div>
+
+<div class="modal-overlay" id="tripModal">
+  <div class="modal">
+    <h2>{{ _('إضافة مشوار') }}</h2>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('المنصة') }} *</label><select id="tripPlatform">
+        <option value="uber">Uber</option><option value="didi">Didi</option>
+        <option value="indrive">InDrive</option><option value="personal">{{ _('شخصي') }}</option>
+      </select></div>
+      <div class="form-group"><label>{{ _('التاريخ') }} *</label><input type="date" id="tripDate"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('أجرة') }} *</label><input type="number" id="tripFare" step="0.01" min="0"></div>
+      <div class="form-group"><label>{{ _('بقشيش') }}</label><input type="number" id="tripTip" step="0.01" min="0" value="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('عمولة') }}</label><input type="number" id="tripCommission" step="0.01" min="0" value="0"></div>
+      <div class="form-group"><label>{{ _('المسافة (كم)') }}</label><input type="number" id="tripDistance" step="0.1" min="0" value="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('البداية') }}</label><input type="time" id="tripStart"></div>
+      <div class="form-group"><label>{{ _('النهاية') }}</label><input type="time" id="tripEnd"></div>
+    </div>
+    <div class="form-group"><label>{{ _('ملاحظات') }}</label><input type="text" id="tripNotes"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('tripModal')">{{ _('إلغاء') }}</button>
+      <button class="btn btn-primary" onclick="addTrip()">{{ _('حفظ') }}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function addTrip() {
+  const data = {
+    platform: document.getElementById('tripPlatform').value,
+    date: document.getElementById('tripDate').value,
+    fare: parseFloat(document.getElementById('tripFare').value)||0,
+    tip: parseFloat(document.getElementById('tripTip').value)||0,
+    commission: parseFloat(document.getElementById('tripCommission').value)||0,
+    distance_km: parseFloat(document.getElementById('tripDistance').value)||0,
+    start_time: document.getElementById('tripStart').value,
+    end_time: document.getElementById('tripEnd').value,
+    notes: document.getElementById('tripNotes').value,
+  };
+  if(!data.fare){toast('{{ _('الرجاء إدخال الأجرة') }}','var(--red)');return}
+  await api('/api/trips',{method:'POST',body:JSON.stringify(data)});
+  toast('{{ _('تمت الإضافة') }}');
+  closeModal('tripModal');
+  loadTrips();
+  document.getElementById('tripFare').value='';
+  document.getElementById('tripTip').value='0';
+  document.getElementById('tripCommission').value='0';
+  document.getElementById('tripDistance').value='0';
+  document.getElementById('tripNotes').value='';
+}
+
+async function deleteTrip(id) {
+  if(!confirm('{{ _('حذف المشوار؟') }}')) return;
+  await api(`/api/trips/${id}`,{method:'DELETE'});
+  toast('{{ _('تم الحذف') }}');
+  loadTrips();
+}
+
+async function loadTrips() {
+  const days = document.getElementById('daysFilter').value;
+  const pf = document.getElementById('platformFilter').value;
+  const r = await api(`/api/trips?days=${days}&limit=500&platform=${pf}`);
+  const t = document.getElementById('tripsTable');
+  const e = document.getElementById('tripsEmpty');
+
+  let totalFare=0, totalComm=0, totalTrips=r.data.length;
+  t.innerHTML = '';
+  if(r.data.length===0){e.style.display='block';} else {e.style.display='none';
+    r.data.forEach((tr,i) => {
+      const net = tr.fare + tr.tip - tr.commission;
+      totalFare += net; totalComm += tr.commission;
+      t.innerHTML += `<tr>
+        <td class="text-muted">${r.total-i}</td>
+        <td>${tr.date}</td>
+        <td><span class="platform-tag ${tr.platform}">${PLATFORM_NAMES[tr.platform]||tr.platform}</span></td>
+        <td class="text-muted">${tr.start_time||'—'}</td>
+        <td>${fmt(tr.fare)}</td>
+        <td>${fmt(tr.tip)}</td>
+        <td class="text-muted">${fmt(tr.commission)}</td>
+        <td style="color:var(--green);font-weight:600">${fmt(net)}</td>
+        <td class="text-muted">${tr.distance_km?tr.distance_km+' {{ _('كم') }}':'—'}</td>
+        <td><button class="btn btn-sm btn-icon" onclick="deleteTrip(${tr.id})"></button></td>
+      </tr>`;
+    });
+  }
+  document.getElementById('totalTrips').textContent = totalTrips;
+  document.getElementById('totalRevenue').textContent = fmt(totalFare) + ' {{ _('ج.م') }}';
+  document.getElementById('totalCommissions').textContent = fmt(totalComm) + ' {{ _('ج.م') }}';
+  document.getElementById('avgFare').textContent = totalTrips>0 ? fmt(totalFare/totalTrips) + ' {{ _('ج.م') }}' : '—';
+}
+
+document.getElementById('tripDate').value = new Date().toISOString().split('T')[0];
+document.addEventListener('DOMContentLoaded', loadTrips);
+</script>
+{% endblock %}

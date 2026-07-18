@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:1.25rem}
+.driver-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;margin-bottom:1.25rem}
+.driver-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;border-{% if dir=="rtl" %}right{% else %}left{% endif %}:3px solid var(--accent);cursor:pointer;transition:all .15s}
+.driver-card:hover{border-color:var(--accent);background:var(--accent-glow)}
+.driver-card .dc-name{font-weight:600;font-size:.9rem;margin-bottom:6px;display:flex;align-items:center;gap:6px;color:var(--text-title)}
+.driver-card .dc-stat{display:flex;justify-content:space-between;font-size:.76rem;padding:3px 0;color:var(--text-muted)}
+.chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1rem}
+.chart-card .chart-wrap{position:relative;height:260px}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.25rem}
+.partner-bar{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.7rem 1rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;font-size:.78rem;color:var(--text-muted)}
+.partner-bar strong{color:var(--text-body)}
+@media(max-width:900px){.charts-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.cards{grid-template-columns:1fr}.driver-cards{grid-template-columns:1fr}}
+</style>
+
+<div class="header">
+  <h1>{{ _('لوحة المالك') }}</h1>
+  <div class="header-left">
+    <button class="btn btn-primary btn-sm" onclick="window.location.href='/drivers'">{{ _('ادارة السواقين') }}</button>
+    <select class="period-select" id="period" onchange="loadData()">
+      <option value="week">{{ _('آخر اسبوع') }}</option>
+      <option value="month" selected>{{ _('آخر شهر') }}</option>
+      <option value="year">{{ _('آخر سنة') }}</option>
+      <option value="all">{{ _('كل الفترة') }}</option>
+    </select>
+  </div>
+</div>
+
+<div class="cards" id="kpiCards">
+  <div class="card"><div class="label">{{ _('اجمالي الايرادات') }}</div><div class="value text-green" id="kpiGross">—</div><div class="sub">{{ _('من كل السواقين') }}</div></div>
+  <div class="card"><div class="label">{{ _('عدد السواقين') }}</div><div class="value" id="kpiDrivers">—</div><div class="sub">{{ _('نشطين في الفترة دي') }}</div></div>
+  <div class="card"><div class="label">{{ _('اجمالي المصروفات') }}</div><div class="value text-red" id="kpiCosts">—</div><div class="sub">{{ _('مصروفات + صيانة + وقود') }}</div></div>
+  <div class="card"><div class="label">{{ _('المسافة') }}</div><div class="value" id="kpiKm">—</div><div class="sub">{{ _('اجمالي كم') }}</div></div>
+</div>
+
+<div class="partner-bar" id="partnerBar" style="cursor:pointer" onclick="editPartner()">
+  <span>{{ _('حصة الشريك') }}: <strong id="partnerPct">—</strong></span>
+  <span>{{ _('صافي المالك بعد الشريك') }}: <strong id="ownerNetColor">—</strong></span>
+</div>
+
+<h3 style="font-size:.85rem;color:var(--text-muted);margin-bottom:10px">{{ _('اضغط على سواق لمشاهدة التفاصيل') }}</h3>
+<div class="driver-cards" id="driverCards"></div>
+
+<div class="charts-grid">
+  <div class="chart-card">
+    <h3 style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px">{{ _('مقارنة') }}</h3>
+    <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <h3 style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px">{{ _('توزيع') }}</h3>
+    <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Driver Detail Modal -->
+<div class="mo" id="driverModal">
+  <div class="m" style="width:500px">
+    <h2 id="modalDriverName">—</h2>
+    <div class="driver-cards" id="modalDriverTrips" style="max-height:300px;overflow-y:auto;margin-top:10px"></div>
+    <div class="ma" style="margin-top:1rem">
+      <button class="btn btn-primary btn-sm" onclick="closeModal('driverModal')">{{ _('اغلاق') }}</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+function fmt(v){return Number(v).toLocaleString(lang==='ar'?'ar-EG':'en-US',{minimumFractionDigits:0,maximumFractionDigits:2})}
+
+let barChart, pieChart;
+
+async function loadData() {
+  const p = document.getElementById('period').value;
+  const s = await api('/api/owner/summary?period='+p).catch(()=>{drivers:[]});
+
+  document.getElementById('kpiGross').innerHTML = fmt(s.total_gross||0) + ' {{ _('ج.م') }}';
+  document.getElementById('kpiDrivers').textContent = s.driver_count||0;
+  document.getElementById('kpiCosts').innerHTML = fmt(s.total_costs||0) + ' {{ _('ج.م') }}';
+  document.getElementById('kpiKm').innerHTML = fmt(s.total_km||0) + ' {{ _('كم') }}';
+
+  document.getElementById('partnerPct').textContent = (s.partner_share_pct||0) + '%';
+  document.getElementById('ownerNetColor').textContent = fmt(s.total_gross - s.total_costs) + ' {{ _('ج.م') }}';
+
+  const dc = document.getElementById('driverCards');
+  dc.innerHTML = '';
+  (s.drivers||[]).forEach(d => {
+    const name = d.display_name||d.username;
+    dc.innerHTML += '<div class="driver-card" onclick="openDriver('+d.id+',\''+name+'\')">'+
+      '<div class="dc-name">'+name+' <span class="badge">'+d.driver_split_pct+'%</span></div>'+
+      '<div class="dc-stat"><span>{{ _('اجمالي') }}</span><span class="text-green">'+fmt(d.gross_revenue)+' {{ _('ج.م') }}</span></div>'+
+      '<div class="dc-stat"><span>{{ _('نصيب السواق') }}</span><span class="text-accent">'+fmt(d.driver_share)+' {{ _('ج.م') }}</span></div>'+
+      '<div class="dc-stat"><span>{{ _('نصيب المالك') }}</span><span style="color:var(--purple)">'+fmt(d.owner_net_from_driver)+' {{ _('ج.م') }}</span></div>'+
+      '<div class="dc-stat"><span>{{ _('مشاوير') }}</span><span>'+d.trip_count+'</span></div>'+
+      '<div class="dc-stat"><span>{{ _('كم') }}</span><span>'+fmt(d.total_km)+'</span></div>'+
+      '<div class="dc-stat"><span>{{ _('مصروفات') }}</span><span class="text-red">'+fmt(d.total_expenses)+' {{ _('ج.م') }}</span></div>'+
+      '<div class="dc-stat"><span>{{ _('صيانة') }}</span><span class="text-red">'+fmt(d.total_maintenance)+' {{ _('ج.م') }}</span></div></div>';
+  });
+
+  // Charts
+  if(barChart) barChart.destroy();
+  barChart = new Chart(document.getElementById('barChart'), {
+    type:'bar',
+    data:{labels:(s.drivers||[]).map(d=>d.display_name||d.username),
+      datasets:[
+        {label:'{{ _('نصيب السواق') }}',data:(s.drivers||[]).map(d=>d.driver_share),backgroundColor:'#58a6ff88',borderColor:'#58a6ff',borderWidth:1,borderRadius:4},
+        {label:'{{ _('نصيب المالك') }}',data:(s.drivers||[]).map(d=>d.owner_net_from_driver),backgroundColor:'#bc8cff88',borderColor:'#bc8cff',borderWidth:1,borderRadius:4},
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#8b949e',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#8b949e',font:{size:9}},grid:{display:false}},y:{ticks:{color:'#8b949e',font:{size:9}},grid:{color:'#21262d'},beginAtZero:true}}
+    }
+  });
+
+  if(pieChart) pieChart.destroy();
+  pieChart = new Chart(document.getElementById('pieChart'), {
+    type:'doughnut',
+    data:{labels:(s.drivers||[]).map(d=>d.display_name||d.username),datasets:[{data:(s.drivers||[]).map(d=>d.gross_revenue),backgroundColor:['#58a6ff','#3fb950','#d29922','#bc8cff','#f85149','#56d4dd'],borderColor:'#0d1117',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{color:'#8b949e',font:{size:10},padding:10}},
+        tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+fmt(ctx.parsed)+' {{ _('ج.م') }}'}}
+      }
+    }
+  });
+}
+
+async function editPartner() {
+  const cur = document.getElementById('partnerPct').textContent.replace('%','');
+  const pct = prompt('{{ _('نسبة الشريك (%)') }}', cur);
+  if (!pct) return;
+  try {
+    const r = await api('/api/owner/partner-share', {method:'POST', body:JSON.stringify({partner_share_pct:parseFloat(pct)})});
+    toast('{{ _('تم التحديث') }}');
+    loadData();
+  } catch(e) { toast(e.message,'var(--red)'); }
+}
+
+async function openDriver(id, name) {
+  document.getElementById('modalDriverName').textContent = name;
+  document.getElementById('modalDriverTrips').innerHTML = '<p style="color:var(--text-faint);text-align:center">{{ _('تحميل...') }}</p>';
+  openModal('driverModal');
+
+  try {
+    const r = await api('/api/owner/driver-trips/' + id);
+    document.getElementById('modalDriverTrips').innerHTML = r.data.length
+      ? r.data.map(t => '<div class="dc-stat"><span>'+t.platform+'</span><span class="text-green">'+fmt(t.fare)+' {{ _('ج.م') }}</span></div>').join('')
+      : '<p style="color:var(--text-faint);text-align:center">{{ _('لا يوجد مشاوير') }}</p>';
+  } catch(e) {
+    document.getElementById('modalDriverTrips').innerHTML = '<p style="color:var(--text-faint);text-align:center">{{ _('لا توجد بيانات') }}</p>';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+{% endblock %}

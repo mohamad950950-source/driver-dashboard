@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.tabs{display:flex;gap:0;margin-bottom:1rem;border-radius:var(--radius-pill);overflow:hidden;width:fit-content;background:var(--bg-card);border:1px solid var(--border)}
+.tab{padding:8px 18px;font-size:.76rem;cursor:pointer;color:var(--text-faint);transition:all .12s;border:none;background:transparent;font-family:var(--font)}
+.tab.active{background:var(--accent);color:#fff;font-weight:500}
+.fuel-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1rem}
+.brand-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:1rem}
+.brand-card{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--bg-card);border-radius:var(--radius-lg);padding:.85rem .5rem;border:1px solid var(--border)}
+.brand-card .brand-icon{width:44px;height:44px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center}
+.brand-card .brand-name{font-size:.68rem;font-weight:600}
+.brand-card .brand-val{font-size:.85rem;font-weight:700;color:var(--text-title)}
+.brand-card .brand-sub{font-size:.6rem;color:var(--text-faint)}
+@media(max-width:500px){.brand-grid{grid-template-columns:1fr 1fr}}
+</style>
+
+<div class="header">
+  <h1>{{ _('المصروفات') }}</h1>
+  <div class="header-left">
+    <select class="period-select" id="daysFilter" onchange="switchTab(currentTab)">
+      <option value="7">{{ _('7 أيام') }}</option><option value="30" selected>{{ _('30 يوم') }}</option>
+      <option value="90">{{ _('3 شهور') }}</option><option value="365">{{ _('سنة') }}</option>
+    </select>
+  </div>
+</div>
+
+<!-- Brand icons: Fuel + Check Car (like home page) -->
+<div class="brand-grid">
+  <div class="brand-card">
+    <div class="brand-icon" style="background:var(--yellow)">
+      <svg width="22" height="22" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="6" fill="#fff"/><rect x="8" y="4" width="7" height="12" rx="2" fill="var(--yellow)"/><path d="M10 7h3v3h-3z" fill="#fff"/><path d="M16 9l2 3v3a1 1 0 001 1h.5a.5.5 0 00.5-.5v-3l-2-3" stroke="var(--yellow)" stroke-width="1.4" stroke-linecap="round" fill="none"/><rect x="10" y="12" width="3" height="2" rx=".5" fill="#fff"/></svg>
+    </div>
+    <div class="brand-name" style="color:var(--yellow)">Fuel</div>
+    <div class="brand-val" id="fuelBrandCost" style="color:var(--yellow)">0 ج.م</div>
+    <div class="brand-sub" id="fuelBrandCount">0 تموينة</div>
+  </div>
+  <div class="brand-card">
+    <div class="brand-icon" style="background:#8e8e93">
+      <svg width="22" height="22" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="6" fill="#fff"/><circle cx="13" cy="13" r="5.5" stroke="#8e8e93" stroke-width="1.4" fill="none"/><path d="M16 6l2 2-3 3-2-2 3-3z" fill="#8e8e93"/><path d="M9 15l-3 3a1 1 0 01-1.4-1.4l3-3" stroke="#8e8e93" stroke-width="1.4"/></svg>
+    </div>
+    <div class="brand-name" style="color:#8e8e93">Check Car</div>
+    <div class="brand-val" id="maintBrandCost" style="color:#8e8e93">0 ج.م</div>
+    <div class="brand-sub" id="maintBrandCount">0 صيانة</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tabExp" onclick="switchTab('exp')">{{ _('المصروفات') }}</button>
+  <button class="tab" id="tabFuel" onclick="switchTab('fuel')">{{ _('البنزين') }}</button>
+  <button class="tab" id="tabMaint" onclick="switchTab('maint')">{{ _('الصيانة') }}</button>
+</div>
+
+<!-- Expenses Tab -->
+<div id="secExp">
+  <div style="display:flex;gap:8px;margin-bottom:1rem">
+    <button class="btn btn-primary btn-sm" onclick="openModal('expModal')">{{ _('إضافة مصروف') }}</button>
+  </div>
+  <div class="cards" id="expCards">
+    <div class="card"><div class="label">{{ _('الإجمالي') }}</div><div class="value text-red" id="totalExp">—</div></div>
+    <div class="card"><div class="label">{{ _('بنزين') }}</div><div class="value" id="expFuel" style="color:var(--orange)">—</div></div>
+    <div class="card"><div class="label">{{ _('صيانة') }}</div><div class="value" id="expMaint" style="color:var(--purple)">—</div></div>
+    <div class="card"><div class="label">{{ _('أخرى') }}</div><div class="value" id="expOther">—</div></div>
+  </div>
+  <div class="chart-card" style="margin-bottom:1rem"><h3>{{ _('توزيع') }}</h3><div class="chart-wrap" style="height:200px"><canvas id="expPie"></canvas></div></div>
+  <div class="table-wrap"><table><thead><tr><th>{{ _('التاريخ') }}</th><th>{{ _('التصنيف') }}</th><th>{{ _('المبلغ') }}</th><th>{{ _('ملاحظات') }}</th><th></th></tr></thead><tbody id="expTable"></tbody></table></div>
+  <div class="empty-state" id="expEmpty" style="display:none"><h3>{{ _('لا توجد مصروفات') }}</h3></div>
+</div>
+
+<!-- Fuel Tab -->
+<div id="secFuel" style="display:none">
+  <div class="fuel-stats" id="fuelStatsCards">
+    <div class="card"><div class="label">{{ _('آخر عداد') }}</div><div class="value" id="lastOdo">—</div></div>
+    <div class="card"><div class="label">{{ _('إجمالي لتر') }}</div><div class="value" id="totalLiters" style="color:var(--orange)">—</div></div>
+    <div class="card"><div class="label">{{ _('التكلفة') }}</div><div class="value text-red" id="totalFuelCost">—</div></div>
+    <div class="card"><div class="label">{{ _('كم/لتر') }}</div><div class="value" id="kmPerLiter" style="color:var(--accent)">—</div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:1rem">
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('fuelForm').style.display=document.getElementById('fuelForm').style.display==='none'?'block':'none'">{{ _('تسجيل تموينة') }}</button>
+  </div>
+  <div class="odo-form" id="fuelForm" style="display:none;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1rem">
+    <div class="form-row-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <input type="number" id="fO" placeholder="{{ _('قراءة العداد كم') }}">
+      <input type="number" id="fL" step="0.1" placeholder="{{ _('لتر') }}">
+      <input type="number" id="fC" step="0.01" placeholder="{{ _('التكلفة ج.م') }}">
+    </div>
+    <div class="modal-actions" style="margin-top:8px">
+      <button class="btn" onclick="document.getElementById('fuelForm').style.display='none'">{{ _('إلغاء') }}</button>
+      <button class="btn btn-primary" onclick="addFuel()">{{ _('حفظ') }}</button>
+    </div>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>{{ _('التاريخ') }}</th><th>{{ _('عداد') }}</th><th>{{ _('لتر') }}</th><th>{{ _('التكلفة') }}</th><th></th></tr></thead><tbody id="fuelTable"></tbody></table></div>
+  <div class="empty-state" id="fuelEmpty" style="display:none"><h3>{{ _('لا توجد تموينات') }}</h3></div>
+</div>
+
+<!-- Maintenance Tab -->
+<div id="secMaint" style="display:none">
+  <div style="display:flex;gap:8px;margin-bottom:1rem">
+    <button class="btn btn-primary btn-sm" onclick="openModal('maintModal')">{{ _('تسجيل صيانة') }}</button>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="label">{{ _('إجمالي الصيانة') }}</div><div class="value text-red" id="totalMaint">—</div></div>
+    <div class="card"><div class="label">{{ _('آخر صيانة') }}</div><div class="value" id="lastMaint">—</div></div>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>{{ _('التاريخ') }}</th><th>{{ _('النوع') }}</th><th>{{ _('التكلفة') }}</th><th>{{ _('الورشة') }}</th><th></th></tr></thead><tbody id="maintTable"></tbody></table></div>
+  <div class="empty-state" id="maintEmpty" style="display:none"><h3>{{ _('لا توجد صيانة') }}</h3></div>
+</div>
+
+<!-- Expense Modal -->
+<div class="modal-overlay" id="expModal">
+  <div class="modal">
+    <h2>{{ _('إضافة مصروف') }}</h2>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('التصنيف') }} *</label><select id="expCat">
+        <option value="بنزين">{{ _('بنزين') }}</option><option value="زيت">{{ _('زيت') }}</option>
+        <option value="إطارات">{{ _('إطارات') }}</option><option value="غسيل">{{ _('غسيل') }}</option>
+        <option value="تأمين">{{ _('تأمين') }}</option><option value="رخصة">{{ _('رخصة') }}</option>
+        <option value="مخالفات">{{ _('مخالفات') }}</option><option value="إيجار">{{ _('إيجار') }}</option>
+        <option value="أخرى">{{ _('أخرى') }}</option>
+      </select></div>
+      <div class="form-group"><label>{{ _('التاريخ') }}</label><input type="date" id="expDate"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('المبلغ') }} *</label><input type="number" id="expAmount" step="0.01"></div>
+      <div class="form-group"><label>{{ _('ملاحظات') }}</label><input type="text" id="expNotes"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('expModal')">{{ _('إلغاء') }}</button>
+      <button class="btn btn-primary" onclick="addExpense()">{{ _('حفظ') }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- Maintenance Modal -->
+<div class="modal-overlay" id="maintModal">
+  <div class="modal">
+    <h2>{{ _('تسجيل صيانة') }}</h2>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('النوع') }} *</label><select id="mT">
+        <option value="تغيير زيت">{{ _('تغيير زيت') }}</option><option value="فرامل">{{ _('فرامل') }}</option>
+        <option value="تكييف">{{ _('تكييف') }}</option><option value="إطارات">{{ _('إطارات') }}</option>
+        <option value="عفشة">{{ _('عفشة') }}</option><option value="كهرباء">{{ _('كهرباء') }}</option>
+        <option value="أخرى">{{ _('أخرى') }}</option>
+      </select></div>
+      <div class="form-group"><label>{{ _('التاريخ') }}</label><input type="date" id="mD"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('التكلفة') }} *</label><input type="number" id="mC" step="0.01"></div>
+      <div class="form-group"><label>{{ _('الورشة') }}</label><input type="text" id="mS"></div>
+    </div>
+    <div class="form-group"><label>{{ _('ملاحظات') }}</label><input type="text" id="mN"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('maintModal')">{{ _('إلغاء') }}</button>
+      <button class="btn btn-primary" onclick="addMaint()">{{ _('حفظ') }}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentTab='exp',expPie;
+
+function switchTab(t){
+  currentTab=t;
+  ['exp','fuel','maint'].forEach(x=>{
+    document.getElementById('tab'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===t);
+    document.getElementById('sec'+x.charAt(0).toUpperCase()+x.slice(1)).style.display=x===t?'block':'none';
+  });
+  if(t==='exp') loadExpenses();
+  else if(t==='fuel') loadFuel();
+  else if(t==='maint') loadMaint();
+}
+
+// Expenses
+async function addExpense(){
+  const data={category:document.getElementById('expCat').value,amount:parseFloat(document.getElementById('expAmount').value)||0,date:document.getElementById('expDate').value,notes:document.getElementById('expNotes').value};
+  if(!data.amount){toast('ادخل المبلغ','var(--red)');return}
+  await api('/api/expenses',{method:'POST',body:JSON.stringify(data)});
+  toast('تم');closeModal('expModal');loadExpenses();
+}
+async function deleteExp(id){
+  if(!confirm('حذف؟')) return;
+  await api(`/api/expenses/${id}`,{method:'DELETE'});loadExpenses();
+}
+async function loadExpenses(){
+  const d=document.getElementById('daysFilter').value;
+  const r=await api(`/api/expenses?days=${d}`);
+  let total=0,fuel=0,maint=0,other=0,ct={};
+  document.getElementById('expTable').innerHTML='';
+  if(!r.data.length){document.getElementById('expEmpty').style.display='block';}else{
+    document.getElementById('expEmpty').style.display='none';
+    r.data.forEach(x=>{
+      total+=x.amount;
+      if(x.category==='بنزين')fuel+=x.amount;
+      else if(['زيت','إطارات','فرامل','صيانة','تكييف','عفشة','كهرباء','أخرى'].includes(x.category))maint+=x.amount;
+      else other+=x.amount;
+      ct[x.category]=(ct[x.category]||0)+x.amount;
+      document.getElementById('expTable').innerHTML+=`<tr><td>${x.date}</td><td><span class="platform-tag" style="background:var(--bg3);color:var(--text);border:1px solid var(--border)">${x.category}</span></td><td style="color:var(--red);font-weight:600">${fmt(x.amount)} ج.م</td><td class="text-muted">${x.notes||'—'}</td><td><button class="btn btn-sm btn-icon" onclick="deleteExp(${x.id})">✕</button></td></tr>`;
+    });
+  }
+  document.getElementById('totalExp').textContent=fmt(total)+' ج.م';
+  document.getElementById('expFuel').textContent=fmt(fuel)+' ج.م';
+  document.getElementById('expMaint').textContent=fmt(maint)+' ج.م';
+  document.getElementById('expOther').textContent=fmt(other)+' ج.م';
+  if(expPie)expPie.destroy();
+  const cl=['#d29922','#bc8cff','#58a6ff','#3fb950','#f85149','#56d4dd','#e6edf3','#8b949e','#30363d'];
+  expPie=new Chart(document.getElementById('expPie'),{type:'doughnut',data:{labels:Object.keys(ct),datasets:[{data:Object.values(ct),backgroundColor:cl.slice(0,Object.keys(ct).length),borderColor:'#0d1117',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8b949e',font:{size:10},padding:10}}}}});
+}
+
+// Fuel
+async function addFuel(){
+  const o=+document.getElementById('fO').value,l=+document.getElementById('fL').value,c=+document.getElementById('fC').value;
+  if(!o||!l||!c){toast('ادخل كل البيانات','var(--red)');return}
+  await api('/api/fuel',{method:'POST',body:JSON.stringify({date:new Date().toISOString().split('T')[0],odometer_km:o,liters:l,total_cost:c,notes:''})});
+  toast('تم');document.getElementById('fuelForm').style.display='none';loadFuel();
+}
+async function deleteFuel(id){
+  if(!confirm('حذف؟'))return;
+  await api(`/api/fuel/${id}`,{method:'DELETE'});loadFuel();
+}
+async function loadFuel(){
+  const d=document.getElementById('daysFilter').value;
+  const r=await api(`/api/fuel?days=${d}`);
+  const s=await api(`/api/fuel/stats?days=${d}`);
+  document.getElementById('lastOdo').textContent=s.last_odometer?s.last_odometer+' كم':'—';
+  document.getElementById('totalLiters').textContent=fmt(s.total_liters)+' لتر';
+  document.getElementById('totalFuelCost').textContent=fmt(s.total_cost)+' ج.م';
+  document.getElementById('kmPerLiter').textContent=s.km_per_liter?fmt(s.km_per_liter):'—';
+  document.getElementById('fuelBrandCost').textContent=fmt(s.total_cost||0)+' ج.م';
+  document.getElementById('fuelBrandCount').textContent=(r.data?r.data.length:0)+' تموينة';
+  document.getElementById('fuelTable').innerHTML='';
+  if(!r.data.length){document.getElementById('fuelEmpty').style.display='block';}else{
+    document.getElementById('fuelEmpty').style.display='none';
+    r.data.forEach(x=>{
+      document.getElementById('fuelTable').innerHTML+=`<tr><td>${x.date}</td><td>${x.odometer_km} كم</td><td>${x.liters} لتر</td><td style="color:var(--red)">${fmt(x.total_cost)} ج.م</td><td><button class="btn btn-sm btn-icon" onclick="deleteFuel(${x.id})">✕</button></td></tr>`;
+    });
+  }
+}
+
+// Maintenance
+async function addMaint(){
+  const t=document.getElementById('mT').value,c=+document.getElementById('mC').value;
+  if(!c){toast('ادخل التكلفة','var(--red)');return}
+  await api('/api/maintenance',{method:'POST',body:JSON.stringify({date:document.getElementById('mD').value,type:t,cost:c,shop_name:document.getElementById('mS').value,notes:document.getElementById('mN').value,description:t})});
+  toast('تم');closeModal('maintModal');loadMaint();
+}
+async function deleteMaint(id){
+  if(!confirm('حذف؟'))return;
+  await api(`/api/maintenance/${id}`,{method:'DELETE'});loadMaint();
+}
+async function loadMaint(){
+  const d=document.getElementById('daysFilter').value;
+  const r=await api(`/api/maintenance?days=${d}`);
+  document.getElementById('maintTable').innerHTML='';
+  let total=0;
+  if(!r.data||!r.data.length){document.getElementById('maintEmpty').style.display='block';}else{
+    document.getElementById('maintEmpty').style.display='none';
+    r.data.forEach(x=>{
+      total+=x.cost;
+      document.getElementById('maintTable').innerHTML+=`<tr><td>${x.date}</td><td>${x.type}</td><td style="color:var(--red)">${fmt(x.cost)} ج.م</td><td class="text-muted">${x.shop_name||'—'}</td><td><button class="btn btn-sm btn-icon" onclick="deleteMaint(${x.id})">✕</button></td></tr>`;
+    });
+  }
+  document.getElementById('totalMaint').textContent=fmt(total)+' ج.م';
+  document.getElementById('lastMaint').textContent=r.data&&r.data[0]?r.data[0].date:'—';
+  document.getElementById('maintBrandCost').textContent=fmt(total)+' ج.م';
+  document.getElementById('maintBrandCount').textContent=(r.data?r.data.length:0)+' صيانة';
+}
+
+document.getElementById('expDate').value=new Date().toISOString().split('T')[0];
+document.getElementById('mD').value=new Date().toISOString().split('T')[0];
+document.addEventListener('DOMContentLoaded',()=>switchTab('exp'));
+</script>
+{% endblock %}

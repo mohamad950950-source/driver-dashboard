@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1rem}
+.platform-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem}
+@media(max-width:500px){.platform-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+
+<div class="header">
+  <h1>{{ _('الايرادات') }}</h1>
+  <div class="header-left">
+    <button class="btn btn-primary" onclick="openModal('tripModal')">{{ _('إضافة مشوار') }}</button>
+    <select class="period-select" id="daysFilter" onchange="loadRevenue()">
+      <option value="7">{{ _('7 أيام') }}</option><option value="30" selected>{{ _('30 يوم') }}</option>
+      <option value="90">{{ _('3 شهور') }}</option><option value="365">{{ _('سنة') }}</option>
+    </select>
+    <select class="period-select" id="platformFilter" onchange="loadRevenue()">
+      <option value="all">{{ _('كل المنصات') }}</option>
+      <option value="uber">Uber</option><option value="didi">Didi</option>
+      <option value="indrive">InDrive</option><option value="personal">VIP Trip</option>
+    </select>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="label">{{ _('إجمالي الإيرادات') }}</div><div class="value text-green" id="totalRevenue">—</div></div>
+  <div class="card"><div class="label">{{ _('عدد المشاوير') }}</div><div class="value" id="totalTrips">—</div></div>
+  <div class="card"><div class="label">{{ _('العمولات') }}</div><div class="value text-red" id="totalCommissions">—</div></div>
+  <div class="card"><div class="label">{{ _('متوسط الأجرة') }}</div><div class="value" id="avgFare">—</div></div>
+</div>
+
+<h3 style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">{{ _('حسب المنصة') }}</h3>
+<div class="platform-grid" id="platformGrid"></div>
+
+<div class="table-wrap" id="tripsSection">
+  <table><thead><tr>
+    <th>#</th><th>{{ _('التاريخ') }}</th><th>{{ _('المنصة') }}</th><th>{{ _('الأجرة') }}</th><th>{{ _('بقشيش') }}</th><th>{{ _('عمولة') }}</th><th>{{ _('الصافي') }}</th><th>{{ _('كم') }}</th><th></th>
+  </tr></thead><tbody id="tripsTable"></tbody></table>
+</div>
+<div class="empty-state" id="tripsEmpty" style="display:none"><h3>{{ _('لا توجد مشاوير') }}</h3></div>
+
+<!-- Add Trip Modal -->
+<div class="modal-overlay" id="tripModal">
+  <div class="modal">
+    <h2>{{ _('إضافة مشوار') }}</h2>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('المنصة') }} *</label><select id="tripPlatform">
+        <option value="uber">Uber</option><option value="didi">Didi</option>
+        <option value="indrive">InDrive</option><option value="personal">VIP Trip</option>
+      </select></div>
+      <div class="form-group"><label>{{ _('التاريخ') }} *</label><input type="date" id="tripDate"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('أجرة') }} *</label><input type="number" id="tripFare" step="0.01"></div>
+      <div class="form-group"><label>{{ _('بقشيش') }}</label><input type="number" id="tripTip" step="0.01" value="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>{{ _('عمولة') }}</label><input type="number" id="tripCommission" step="0.01" value="0"></div>
+      <div class="form-group"><label>{{ _('كم') }}</label><input type="number" id="tripDistance" step="0.1" value="0"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('tripModal')">{{ _('إلغاء') }}</button>
+      <button class="btn btn-primary" onclick="addTrip()">{{ _('حفظ') }}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PF = {uber:'#000000',didi:'#FF6600',indrive:'#00B14F',personal:'#0071e3'};
+const PN = {uber:'Uber',didi:'Didi',indrive:'InDrive',personal:'VIP Trip'};
+const PLATFORM_NAMES = PN;
+
+async function addTrip() {
+  const data = {
+    platform: document.getElementById('tripPlatform').value,
+    date: document.getElementById('tripDate').value,
+    fare: parseFloat(document.getElementById('tripFare').value)||0,
+    tip: parseFloat(document.getElementById('tripTip').value)||0,
+    commission: parseFloat(document.getElementById('tripCommission').value)||0,
+    distance_km: parseFloat(document.getElementById('tripDistance').value)||0,
+  };
+  if(!data.fare){toast('{{ _('ادخل الأجرة') }}','var(--red)');return}
+  await api('/api/trips',{method:'POST',body:JSON.stringify(data)});
+  toast('{{ _('تمت الإضافة') }}');
+  closeModal('tripModal');
+  loadRevenue();
+  document.getElementById('tripFare').value='';document.getElementById('tripTip').value='0';
+  document.getElementById('tripCommission').value='0';document.getElementById('tripDistance').value='0';
+}
+
+async function deleteTrip(id) {
+  if(!confirm('{{ _('حذف المشوار؟') }}')) return;
+  await api(`/api/trips/${id}`,{method:'DELETE'});
+  toast('{{ _('تم الحذف') }}');
+  loadRevenue();
+}
+
+async function loadRevenue() {
+  const days = document.getElementById('daysFilter').value;
+  const pf = document.getElementById('platformFilter').value;
+  const r = await api(`/api/trips?days=${days}&limit=500&platform=${pf}`);
+  const t = document.getElementById('tripsTable');
+  const e = document.getElementById('tripsEmpty');
+  let totalFare=0,totalComm=0,totalTrips=r.data.length,byPf={};
+  t.innerHTML='';
+  if(r.data.length===0){e.style.display='block';} else {e.style.display='none';
+    r.data.forEach((tr,i)=>{
+      const net=tr.fare+tr.tip-tr.commission;
+      totalFare+=net;totalComm+=tr.commission;
+      if(!byPf[tr.platform]) byPf[tr.platform]={count:0,fares:0,commissions:0,nets:0};
+      byPf[tr.platform].count++;
+      byPf[tr.platform].fares+=tr.fare;
+      byPf[tr.platform].commissions+=tr.commission;
+      byPf[tr.platform].nets+=net;
+      t.innerHTML+=`<tr><td class="text-muted">${r.total-i}</td><td>${tr.date}</td><td><span class="platform-tag ${tr.platform}">${PLATFORM_NAMES[tr.platform]||tr.platform}</span></td><td>${fmt(tr.fare)}</td><td>${fmt(tr.tip)}</td><td class="text-muted">${fmt(tr.commission)}</td><td style="color:var(--green);font-weight:600">${fmt(net)}</td><td class="text-muted">${tr.distance_km?tr.distance_km+' كم':'—'}</td><td><button class="btn btn-sm btn-icon" onclick="deleteTrip(${tr.id})">✕</button></td></tr>`;
+    });
+  }
+  document.getElementById('totalTrips').textContent=totalTrips;
+  document.getElementById('totalRevenue').textContent=fmt(totalFare)+' ج.م';
+  document.getElementById('totalCommissions').textContent=fmt(totalComm)+' ج.م';
+  document.getElementById('avgFare').textContent=totalTrips>0?fmt(totalFare/totalTrips)+' ج.م':'—';
+  // Platform cards — branded like home page
+  const pg=document.getElementById('platformGrid');pg.innerHTML='';
+  const BRAND = {uber:{svg:'<svg width="36" height="36" viewBox="0 0 24 24"><rect x="0" y="0" width="24" height="24" rx="5" fill="#000"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-weight="700" font-size="6.5" font-family="Arial,sans-serif">Uber</text></svg>',c:'#000000'},didi:{svg:'<svg width="36" height="36" viewBox="0 0 24 24"><rect x="0" y="0" width="24" height="24" rx="6" fill="#FF6600"/><path d="M9 8h3a4 4 0 010 8H9V8zm1.5 1.5v5h1.5a2.5 2.5 0 000-5z" fill="#fff"/></svg>',c:'#FF6600'},indrive:{svg:'<svg width="36" height="36" viewBox="0 0 24 24"><rect x="0" y="0" width="24" height="24" rx="6" fill="#00B14F"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-weight="700" font-size="12" font-family="Arial,sans-serif">in</text></svg>',c:'#00B14F'},personal:{svg:'<svg width="36" height="36" viewBox="0 0 24 24"><rect x="0" y="0" width="24" height="24" rx="6" fill="#0071e3"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-weight="700" font-size="8" font-family="Arial,sans-serif">VIP</text></svg>',c:'#0071e3'}};
+  ['uber','didi','indrive','personal'].forEach(p=>{
+    const d=byPf[p]||{count:0,fares:0,commissions:0,nets:0};
+    const b=BRAND[p];
+    pg.innerHTML+=`<div style="display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--bg-card);border-radius:var(--radius-lg);padding:.85rem .5rem;border:1px solid var(--border)"><div style="width:44px;height:44px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;background:${b.c}">${b.svg}</div><div style="font-size:.68rem;font-weight:600;color:${b.c}">${PN[p]}</div><div style="font-size:.85rem;font-weight:700;color:var(--text-title)">${fmt(d.nets)} ج.م</div><div style="font-size:.6rem;color:var(--text-faint)">${d.count} مشاوير</div></div>`;
+  });
+}
+
+document.getElementById('tripDate').value=new Date().toISOString().split('T')[0];
+document.addEventListener('DOMContentLoaded',loadRevenue);
+</script>
+{% endblock %}

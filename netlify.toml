@@ -1,0 +1,34 @@
+[build]
+  command = ""
+  functions = "api"
+  publish = "."
+
+[functions]
+  # Python 3.11 is default on Netlify
+  included_files = ["templates/**", "api/**", "db.py", "app.py", "schema_pg.py", "translations.py"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/main"
+  status = 200
+
+[[redirects]]
+  from = "/static/*"
+  to = "/static/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/uploads/*"
+  to = "/uploads/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/main"
+  status = 200
+  
+[functions.main]
+  # Mangum handler
+  handler = "main.handler"
+  # Set high memory for Jinja2 rendering
+  included_files = ["templates/**"]

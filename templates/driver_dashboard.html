@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.today-banner{background:linear-gradient(135deg,#58a6ff22,#3fb95022);border:1px solid var(--accent);border-radius:var(--radius);padding:1.25rem 1.5rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.today-banner .tb-label{color:var(--text2);font-size:.72rem;margin-bottom:2px}
+.today-banner .tb-amount{font-size:1.6rem;font-weight:800;color:var(--green);letter-spacing:-1px}
+.today-banner .tb-sub{color:var(--text2);font-size:.72rem}
+.today-banner .tb-right{display:flex;gap:20px;flex-wrap:wrap}
+.p-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:1.25rem}
+.p-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.9rem 1rem;transition:all .15s}
+.p-card .pc-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.p-card .pc-logo{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;color:#fff;flex-shrink:0}
+.p-card .pc-name{font-weight:600;font-size:.82rem;flex:1}
+.p-card .pc-val{font-size:1.1rem;font-weight:700}
+.p-card .pc-sub{color:var(--text2);font-size:.68rem;margin-top:2px}
+.p-card.vip{background:linear-gradient(135deg,#7C4DFF11,#58a6ff11);border-color:var(--purple)}
+.p-card.vip .pc-logo{background:var(--purple)}
+.p-card.disconnected{opacity:.45}
+.quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem}
+@media(max-width:500px){.quick-actions{grid-template-columns:1fr}}
+.qa-btn{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .15s;font-family:inherit;color:var(--text);text-align:right}
+.qa-btn:hover{transform:translateY(-2px);border-color:var(--text2)}
+.qa-btn .qa-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.qa-btn .qa-text{flex:1}
+.qa-btn .qa-title{font-weight:600;font-size:.85rem}
+.qa-btn .qa-desc{font-size:.7rem;color:var(--text2)}
+.qa-btn .qa-arrow{color:var(--text2);font-size:.75rem}
+.qa-fuel .qa-icon{background:var(--orange);color:#fff}
+.qa-fuel:hover{border-color:var(--orange)}
+.qa-maint .qa-icon{background:var(--purple);color:#fff}
+.qa-maint:hover{border-color:var(--purple)}
+.fuel-mini{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1.25rem;display:none}
+.fuel-mini .fm-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+@media(max-width:500px){.fuel-mini .fm-row{grid-template-columns:1fr}}
+.fuel-mini input,.fuel-mini select{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-family:inherit;font-size:.78rem;width:100%}
+.fuel-mini input:focus{outline:2px solid var(--orange);border-color:transparent}
+.fuel-mini .fm-actions{display:flex;gap:8px}
+.fuel-mini .fm-actions button{flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-weight:600;font-size:.78rem;font-family:inherit}
+.maint-mini{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1.25rem;display:none}
+.maint-mini .mm-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+@media(max-width:500px){.maint-mini .mm-row{grid-template-columns:1fr}}
+.maint-mini input,.maint-mini select{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-family:inherit;font-size:.78rem;width:100%}
+.maint-mini input:focus{outline:2px solid var(--purple);border-color:transparent}
+.maint-mini .mm-actions{display:flex;gap:8px}
+.maint-mini .mm-actions button{flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;font-weight:600;font-size:.78rem;font-family:inherit}
+.trip-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1.5rem}
+.trip-card .tc-head{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
+.trip-card .tc-head h3{font-size:.85rem;color:var(--text2);font-weight:600}
+.trip-card table{width:100%;border-collapse:collapse;font-size:.78rem}
+.trip-card th{padding:8px 12px;text-align:right;font-weight:600;color:var(--text2);background:var(--bg3);white-space:nowrap}
+.trip-card td{padding:8px 12px;border-bottom:1px solid var(--border)}
+.trip-card tr:last-child td{border-bottom:none}
+.platform-tag{display:inline-block;padding:1px 8px;border-radius:4px;font-size:.68rem;font-weight:600}
+.platform-tag.uber{color:#06C167;background:#06C16722}
+.platform-tag.didi{color:#FF6B35;background:#FF6B3522}
+.platform-tag.indrive{color:#E53935;background:#E5393522}
+.platform-tag.personal{color:#7C4DFF;background:#7C4DFF22}
+</style>
+
+<script>
+const PF_COLORS = {uber:'#000000',didi:'#FF6600',indrive:'#00B14F',personal:'#0071e3'};
+const PF_NAMES = {uber:'Uber',didi:'Didi',indrive:'InDrive',personal:'VIP Trip'};
+</script>
+
+<div class="today-banner" id="todayBanner">
+  <div>
+    <div class="tb-label">{{ _('شغل اليوم') }}</div>
+    <div class="tb-amount" id="todayEarnings">0 {{ _('ج.م') }}</div>
+    <div class="tb-sub" id="todaySub">0 {{ _('مشاوير') }} - 0 {{ _('كم') }}</div>
+  </div>
+  <div class="tb-right" id="todayBreakdown"></div>
+</div>
+
+<div class="p-grid" id="platformGrid"></div>
+
+<div class="quick-actions">
+  <div class="qa-btn qa-fuel" onclick="toggleFuelForm()">
+  <div class="qa-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 19V7c0-1-1-2-2-2H6c-1 0-2 1-2 2v12"/><path d="M2 19h16"/><path d="M14 12h-3l2-4h-3"/><path d="M20 7v12"/></svg></div>
+  <div class="qa-text">
+    <div class="qa-title">{{ _('بنزين') }}</div>
+    <div class="qa-desc">{{ _('سجل تموينة - صور العداد') }}</div>
+  </div>
+  <div class="qa-arrow">+</div>
+  </div>
+  <div class="qa-btn qa-maint" onclick="toggleMaintForm()">
+  <div class="qa-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+    <div class="qa-text">
+      <div class="qa-title">{{ _('صيانة') }}</div>
+      <div class="qa-desc">{{ _('سجل صيانة - زيت - فرامل - غيره') }}</div>
+    </div>
+    <div class="qa-arrow">+</div>
+  </div>
+</div>
+
+<div class="fuel-mini" id="fuelMini">
+  <div class="fm-row">
+    <input type="number" id="fOdo" placeholder="{{ _('قراءة العداد كم') }}">
+    <input type="number" id="fLiters" step="0.1" placeholder="{{ _('كام لتر؟') }}">
+    <input type="number" id="fCost" step="0.01" placeholder="{{ _('التكلفة ج.م') }}">
+  </div>
+  <input type="file" id="fPhoto" accept="image/*;capture=camera" capture="environment" style="display:none" onchange="fuelPhoto=this.files[0];document.getElementById('fPhotoLabel').textContent=this.files[0]?'{{ _('تم اختيار الصورة') }}':'{{ _('صور العداد') }}'">
+  <div class="fm-actions">
+    <button style="background:var(--bg3);color:var(--text)" onclick="document.getElementById('fuelMini').style.display='none'">{{ _('الغاء') }}</button>
+    <button id="fPhotoLabel" style="background:var(--orange);color:#fff" onclick="document.getElementById('fPhoto').click()">{{ _('صور العداد') }}</button>
+    <button style="background:var(--orange);color:#fff" onclick="saveFuel()">{{ _('حفظ') }}</button>
+  </div>
+</div>
+
+<div class="maint-mini" id="maintMini">
+  <div class="mm-row">
+    <select id="mType">
+      <option value="{{ _('تغيير زيت') }}">{{ _('تغيير زيت') }}</option>
+      <option value="{{ _('فرامل') }}">{{ _('فرامل') }}</option>
+      <option value="{{ _('تكييف') }}">{{ _('تكييف') }}</option>
+      <option value="{{ _('إطارات') }}">{{ _('إطارات') }}</option>
+      <option value="{{ _('كهرباء') }}">{{ _('كهرباء') }}</option>
+      <option value="{{ _('عفشة') }}">{{ _('عفشة') }}</option>
+      <option value="{{ _('أخرى') }}">{{ _('أخرى') }}</option>
+    </select>
+    <input type="number" id="mCost" step="0.01" placeholder="{{ _('التكلفة ج.م') }}">
+  </div>
+  <div class="mm-row">
+    <input type="text" id="mShop" placeholder="{{ _('اسم الورشة') }}">
+    <input type="text" id="mNotes" placeholder="{{ _('ملاحظات') }}">
+  </div>
+  <div class="mm-actions">
+    <button style="background:var(--bg3);color:var(--text)" onclick="document.getElementById('maintMini').style.display='none'">{{ _('الغاء') }}</button>
+    <button style="background:var(--purple);color:#fff" onclick="saveMaint()">{{ _('حفظ') }}</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="vipModal">
+  <div class="modal">
+    <h2>{{ _('اضافة مشوار VIP') }}</h2>
+    <p style="font-size:.75rem;color:var(--text2);margin-bottom:12px">{{ _('عملاء مميزين - زباين خاصين') }}</p>
+    <div class="form-group"><label>{{ _('المبلغ') }} *</label><input type="text" id="vipAmount" inputmode="decimal" placeholder="{{ _('المبلغ') }}"></div>
+    <div class="form-group"><label>{{ _('ملاحظات') }}</label><input type="text" id="vipNotes" placeholder="{{ _('ملاحظات') }}"></div>
+    <div class="modal-actions">
+      <button class="btn" style="background:var(--bg3);color:var(--text)" onclick="closeVipModal()">{{ _('الغاء') }}</button>
+      <button class="btn" style="background:var(--purple);color:#fff" onclick="saveVipTrip()">{{ _('حفظ') }}</button>
+    </div>
+  </div>
+</div>
+
+<div class="trip-card" id="recentTrips">
+  <div class="tc-head">
+    <h3>{{ _('آخر المشاوير') }}</h3>
+    <select class="period-select" id="pf2" style="padding:4px 8px;font-size:.72rem" onchange="loadData()">
+      <option value="all">{{ _('الكل') }}</option>
+      <option value="uber">Uber</option><option value="didi">Didi</option>
+      <option value="indrive">InDrive</option><option value="personal">VIP</option>
+    </select>
+  </div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>{{ _('التاريخ') }}</th><th>{{ _('المنصة') }}</th><th>{{ _('المبلغ') }}</th><th>{{ _('الصافي') }}</th><th></th>
+  </tr></thead><tbody id="tripsTable"></tbody></table></div>
+  <div class="empty-state" id="tripsEmpty" style="display:none"><h3>{{ _('لا توجد مشاوير') }}</h3><p>{{ _('اربط حساباتك عشان تظهر المشاوير تلقائيا') }}</p></div>
+</div>
+
+<script>
+let fuelPhoto = null;
+
+function toggleFuelForm() {
+  const f = document.getElementById('fuelMini');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  if(f.style.display === 'block') document.getElementById('maintMini').style.display = 'none';
+}
+function toggleMaintForm() {
+  const f = document.getElementById('maintMini');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  if(f.style.display === 'block') document.getElementById('fuelMini').style.display = 'none';
+}
+
+async function saveFuel() {
+  const odo=parseInt(document.getElementById('fOdo').value)||0;
+  const l=parseFloat(document.getElementById('fLiters').value)||0;
+  const c=parseFloat(document.getElementById('fCost').value)||0;
+  if(!odo||!l||!c){toast('{{ _('ادخل كل البيانات') }}','var(--red)');return}
+  try {
+    if(fuelPhoto){
+      const fd=new FormData();fd.append('file',fuelPhoto);fd.append('doc_type','odo');
+      await fetch('/api/upload-document',{method:'POST',body:fd});
+    }
+    await api('/api/fuel',{method:'POST',body:JSON.stringify({
+      date:new Date().toISOString().split('T')[0],odometer_km:odo,liters:l,total_cost:c,notes:''
+    })});
+    toast('{{ _('تم تسجيل التموينة') }}');
+    document.getElementById('fuelMini').style.display='none';
+    document.getElementById('fOdo').value='';document.getElementById('fLiters').value='';document.getElementById('fCost').value='';
+    fuelPhoto=null;
+  }catch(e){toast('{{ _('خطأ: ') }}'+e.message,'var(--red)')}
+}
+
+async function saveMaint() {
+  const t=document.getElementById('mType').value;
+  const c=parseFloat(document.getElementById('mCost').value)||0;
+  if(!c){toast('{{ _('ادخل التكلفة') }}','var(--red)');return}
+  try {
+    await api('/api/maintenance',{method:'POST',body:JSON.stringify({
+      date:new Date().toISOString().split('T')[0],type:t,cost:c,shop_name:document.getElementById('mShop').value,notes:document.getElementById('mNotes').value,description:t
+    })});
+    toast('{{ _('تم تسجيل الصيانة') }}');
+    document.getElementById('maintMini').style.display='none';
+    document.getElementById('mCost').value='';document.getElementById('mShop').value='';document.getElementById('mNotes').value='';
+  }catch(e){toast('{{ _('خطأ: ') }}'+e.message,'var(--red)')}
+}
+
+function openVipModal(){document.getElementById('vipModal').style.display='flex';document.getElementById('vipAmount').value='';document.getElementById('vipNotes').value=''}
+function closeVipModal(){document.getElementById('vipModal').style.display='none'}
+async function saveVipTrip(){
+  const m=document.getElementById('vipAmount').value.replace(/[٠-٩۰-۹]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٫, ]/g,'');
+  const a=parseFloat(m)||0;
+  const n=document.getElementById('vipNotes').value;
+  if(!a){toast('{{ _('ادخل المبلغ') }}','var(--red)');return}
+  try {
+    await api('/api/trips',{method:'POST',body:JSON.stringify({
+      platform:'personal',date:new Date().toISOString().split('T')[0],
+      fare:a,tip:0,commission:0,distance_km:0,notes:n||'VIP trip'
+    })});
+    toast('{{ _('تم حفظ المشوار') }}');closeVipModal();loadData();
+  }catch(e){toast('{{ _('خطأ: ') }}'+e.message,'var(--red)')}
+}
+
+async function loadData() {
+  try {
+    const today = await api('/api/driver-summary?period=today');
+    const month = await api('/api/driver-summary?period=month');
+    const pf = document.getElementById('pf2')?.value||'all';
+    const trips = await api(`/api/trips?days=7&limit=15&platform=${pf}`);
+
+    const tdNet = today.total_net_revenue||0;
+    const tdTrips = today.revenue.reduce((a,r)=>a+r.trip_count,0);
+    const tdKm = today.total_km||0;
+    document.getElementById('todayEarnings').textContent = fmt(tdNet)+' {{ _('ج.م') }}';
+    document.getElementById('todaySub').textContent = tdTrips+' {{ _('مشاوير') }} - '+fmt(tdKm)+' {{ _('كم') }}';
+
+    const brk = document.getElementById('todayBreakdown');
+    brk.innerHTML = '';
+    for(const r of today.revenue){
+      brk.innerHTML += '<div style="text-align:center;padding:0 10px;border-{% if dir=="rtl" %}right{% else %}left{% endif %}:1px solid var(--border)">'+
+        '<div style="font-size:.72rem;color:'+PF_COLORS[r.platform]+';font-weight:600">'+PF_NAMES[r.platform]+'</div>'+
+        '<div style="font-size:.9rem;font-weight:700;color:var(--text)">'+fmt(r.net_revenue)+'</div></div>';
+    }
+
+    const pg = document.getElementById('platformGrid');
+    pg.innerHTML = '';
+    const allPlats = ['uber','didi','indrive','personal'];
+    for(const pid of allPlats){
+      const r = today.revenue.find(x=>x.platform===pid);
+      pg.innerHTML += '<div class="p-card '+(r?'':'disconnected')+' '+(pid==='personal'?'vip':'')+'">'+
+        '<div class="pc-top"><div class="pc-logo" style="background:'+PF_COLORS[pid]+'">'+(pid==='personal'?'V':PF_NAMES[pid][0])+'</div>'+
+        '<div class="pc-name" style="color:'+PF_COLORS[pid]+'">'+PF_NAMES[pid]+'</div></div>'+
+        '<div class="pc-val" style="color:'+(r?PF_COLORS[pid]:'var(--text2)')+'">'+(r?fmt(r.net_revenue)+' {{ _('ج.م') }}':'{{ _('غير متصل') }}')+'</div>'+
+        '<div class="pc-sub">'+(r?r.trip_count+' {{ _('مشاوير') }}':'{{ _('اربط الحساب') }}')+'</div></div>';
+    }
+    pg.querySelector('.p-card.vip')?.addEventListener('click', openVipModal);
+
+    const tt = document.getElementById('tripsTable');
+    const te = document.getElementById('tripsEmpty');
+    tt.innerHTML = '';
+    if(trips.data.length===0){te.style.display='block';}else{
+      te.style.display='none';
+      trips.data.slice(0,10).forEach(t=>{
+        const net = t.fare + t.tip - t.commission;
+        tt.innerHTML += '<tr><td class="text-muted">'+t.date.slice(5)+'</td>'+
+          '<td><span class="platform-tag '+t.platform+'">'+(PF_NAMES[t.platform]||t.platform)+'</span></td>'+
+          '<td>'+fmt(t.fare)+'</td><td style="color:var(--green);font-weight:600">'+fmt(net)+'</td>'+
+          '<td><button class="btn btn-sm btn-icon" onclick="deleteTrip('+t.id+')">X</button></td></tr>';
+      });
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function deleteTrip(id) {
+  if(!confirm('{{ _('حذف المشوار؟') }}')) return;
+  await api(`/api/trips/${id}`,{method:'DELETE'});
+  toast('{{ _('تم الحذف') }}'); loadData();
+}
+
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+{% endblock %}

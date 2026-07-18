@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.fuel-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.25rem}
+.odo-preview{background:var(--bg3);border:2px dashed var(--border);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:1rem}
+.odo-preview:hover{border-color:var(--accent);background:var(--bg2)}
+.odo-preview.has-photo{border-color:var(--green);border-style:solid}
+.odo-form{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1.5rem}
+.odo-form .form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:600px){.odo-form .form-row-3{grid-template-columns:1fr}}
+.required::after{content:' *';color:var(--red);font-weight:700}
+</style>
+
+<div class="header">
+  <h1>{{ _('تتبع البنزين') }}</h1>
+  <div class="header-left">
+    <button class="btn btn-primary" onclick="document.getElementById('fuelForm').style.display=document.getElementById('fuelForm').style.display==='none'?'block':'none'">{{ _('تسجيل تموينة') }}</button>
+  </div>
+</div>
+
+<div class="cards" id="fuelStatsCards">
+  <div class="card"><div class="label">{{ _('آخر قراءة عداد') }}</div><div class="value" id="lastOdo">—</div><div class="sub">{{ _('كم') }}</div></div>
+  <div class="card"><div class="label">{{ _('إجمالي لتر') }}</div><div class="value" id="totalLiters" style="color:var(--orange)">—</div></div>
+  <div class="card"><div class="label">{{ _('إجمالي التكلفة') }}</div><div class="value" id="totalFuelCost" style="color:var(--red)">—</div></div>
+  <div class="card"><div class="label">{{ _('كم/لتر (المعدل)') }}</div><div class="value" id="kmPerLiter" style="color:var(--accent)">—</div></div>
+</div>
+
+<!-- Add Fuel Form -->
+<div class="odo-form" id="fuelForm" style="display:none">
+  <h3 style="margin-bottom:10px;color:var(--text2);font-size:.9rem">{{ _('تسجيل تموينة جديدة') }}</h3>
+  
+  <div class="odo-preview" id="odoBox" onclick="document.getElementById('odoPhoto').click()">
+    <div class="cam-icon">{{ _('صور') }}</div>
+    <div class="cam-text">{{ _('صور العداد (اجباري)') }}</div>
+    <input type="file" id="odoPhoto" accept="image/*;capture=camera" capture="environment" style="display:none" onchange="previewOdo(event)">
+    <div id="odoPreview" style="margin-top:8px;display:none">
+      <img id="odoImg" style="max-height:120px;border-radius:8px;border:1px solid var(--border)">
+    </div>
+  </div>
+
+  <div class="form-row-3">
+    <div class="form-group"><label class="required">{{ _('قراءة العداد (كم)') }}</label><input type="number" id="fuelOdometer" placeholder="{{ _('مثلاً 52340') }}"></div>
+    <div class="form-group"><label class="required">{{ _('كام لتر؟') }}</label><input type="number" id="fuelLiters" step="0.1" placeholder="{{ _('مثلاً 40') }}"></div>
+    <div class="form-group"><label class="required">{{ _('إجمالي الفلوس') }}</label><input type="number" id="fuelCost" step="0.01" placeholder="{{ _('مثلاً 540') }}"></div>
+  </div>
+  
+  <div style="display:flex;gap:10px;margin-top:8px">
+    <button class="btn btn-primary" onclick="addFuel()">{{ _('حفظ التموينة') }}</button>
+    <button class="btn" onclick="document.getElementById('fuelForm').style.display='none'">{{ _('إلغاء') }}</button>
+  </div>
+</div>
+
+<!-- Fuel History Table -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <h3 style="font-size:.85rem;color:var(--text2)">{{ _('سجل التموينات') }}</h3>
+    <select class="period-select" id="daysFilter" style="padding:4px 8px;font-size:.75rem" onchange="loadFuel()">
+      <option value="30">{{ _('آخر شهر') }}</option>
+      <option value="90">{{ _('آخر 3 شهور') }}</option>
+      <option value="365" selected>{{ _('آخر سنة') }}</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table><thead><tr>
+      <th>{{ _('التاريخ') }}</th><th>{{ _('عداد (كم)') }}</th><th>{{ _('لتر') }}</th><th>{{ _('سعر اللتر') }}</th><th>{{ _('الإجمالي') }}</th><th></th>
+    </tr></thead><tbody id="fuelTable"></tbody></table>
+  </div>
+  <div class="empty-state" id="fuelEmpty" style="display:none">
+    <h3>{{ _('لا توجد تموينات') }}</h3>
+    <p>{{ _('سجل أول تموينة بالضغط على تسجيل تموينة') }}</p>
+  </div>
+</div>
+
+<script>
+let photoFile = null;
+
+function previewOdo(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  photoFile = file;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('odoPreview').style.display = 'block';
+    document.getElementById('odoImg').src = e.target.result;
+    document.getElementById('odoBox').classList.add('has-photo');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function addFuel() {
+  const odometer = parseInt(document.getElementById('fuelOdometer').value)||0;
+  const liters = parseFloat(document.getElementById('fuelLiters').value)||0;
+  const cost = parseFloat(document.getElementById('fuelCost').value)||0;
+  
+  if(!odometer || !liters || !cost) {
+    toast('{{ _('ادخل القراءة واللتر والتكلفة') }}', 'var(--red)');
+    return;
+  }
+  if(!photoFile) {
+    toast('{{ _('صور العداد اجباري') }}', 'var(--red)');
+    return;
+  }
+  
+  // Upload photo first
+  const formData = new FormData();
+  formData.append('file', photoFile);
+  formData.append('doc_type', 'odo');
+  try {
+    const photoRes = await fetch('/api/upload-document', {method:'POST', body:formData});
+    const photoData = await photoRes.json();
+    const photoUrl = photoData.url;
+    
+    await api('/api/fuel', {
+      method:'POST',
+      body: JSON.stringify({
+        date: new Date().toISOString().split('T')[0],
+        odometer_km: odometer,
+        liters: liters,
+        total_cost: cost,
+        notes: '',
+        photo_url: photoUrl
+      })
+    });
+    toast('{{ _('تم تسجيل التموينة') }}');
+    document.getElementById('fuelForm').style.display='none';
+    loadFuel();
+    document.getElementById('fuelOdometer').value='';
+    document.getElementById('fuelLiters').value='';
+    document.getElementById('fuelCost').value='';
+    document.getElementById('odoPreview').style.display='none';
+    photoFile = null;
+  } catch(e) {
+    toast('{{ _('خطأ: ') }}' + e.message, 'var(--red)');
+  }
+}
+
+async function deleteFuel(id) {
+  if(!confirm('{{ _('حذف التموينة؟') }}')) return;
+  await api(`/api/fuel/${id}`,{method:'DELETE'});
+  toast('{{ _('تم الحذف') }}');
+  loadFuel();
+}
+
+async function loadFuel() {
+  const days = document.getElementById('daysFilter').value;
+  const stats = await api(`/api/fuel/stats?days=${days}`);
+  document.getElementById('lastOdo').textContent = stats.last_odo ? stats.last_odo.toLocaleString() : '—';
+  document.getElementById('totalLiters').textContent = stats.total_liters ? fmt(stats.total_liters) + ' {{ _('لتر') }}' : '—';
+  document.getElementById('totalFuelCost').textContent = stats.total_cost ? fmt(stats.total_cost) + ' {{ _('ج.م') }}' : '—';
+  document.getElementById('kmPerLiter').textContent = stats.km_per_liter ? fmt(stats.km_per_liter) + ' {{ _('كم/لتر') }}' : '—';
+
+  const r = await api(`/api/fuel?days=${days}`);
+  const t = document.getElementById('fuelTable');
+  const e = document.getElementById('fuelEmpty');
+  t.innerHTML = '';
+  if(r.data.length===0){e.style.display='block';}else{
+    e.style.display='none';
+    r.data.forEach(x => {
+      t.innerHTML += `<tr>
+        <td>${x.date}</td>
+        <td class="text-muted">${x.odometer_km.toLocaleString()}</td>
+        <td>${fmt(x.liters)}</td>
+        <td class="text-muted">${fmt(x.cost_per_liter)} {{ _('ج.م') }}</td>
+        <td style="color:var(--red);font-weight:600">${fmt(x.total_cost)} {{ _('ج.م') }}</td>
+        <td><button class="btn btn-sm btn-icon" onclick="deleteFuel(${x.id})">{{ _('حذف') }}</button></td>
+      </tr>`;
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadFuel);
+</script>
+{% endblock %}

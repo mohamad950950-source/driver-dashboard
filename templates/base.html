@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Driver Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+/* ═══════════════════════════════════════
+   DESIGN SYSTEM — Apple-Inspired
+   أسود نقي · مسافات سينمائية · أزرق واحد
+   ═══════════════════════════════════════ */
+
+:root {
+  --bg-app: #000000;
+  --bg-card: #1c1c1e;
+  --bg-card-hover: #242426;
+  --bg-raised: #2a2a2d;
+  --bg-input: #1c1c1e;
+
+  --text-title: #ffffff;
+  --text-body: #f5f5f7;
+  --text-muted: rgba(255,255,255,0.56);
+  --text-faint: rgba(255,255,255,0.32);
+
+  --accent: #0071e3;
+  --accent-soft: rgba(0,113,227,0.12);
+  --accent-glow: rgba(0,113,227,0.08);
+
+  --green: #30d158;
+  --green-soft: rgba(48,209,88,0.12);
+  --red: #ff453a;
+  --red-soft: rgba(255,69,58,0.12);
+  --orange: #ff9f0a;
+  --yellow: #ffd60a;
+  --purple: #bf5af2;
+
+  --uber: #30d158;
+  --didi: #ff9f0a;
+  --indrive: #ff453a;
+  --vip: #bf5af2;
+
+  --border: rgba(255,255,255,0.08);
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-pill: 980px;
+
+  --shadow: 0 8px 40px rgba(0,0,0,0.5);
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;scroll-behavior:smooth;-webkit-font-smoothing:antialiased;letter-spacing:-.015em}
+body{font-family:var(--font);background:var(--bg-app);color:var(--text-body);min-height:100vh;direction:{{ dir }};line-height:1.5}
+a{color:var(--accent);text-decoration:none}
+
+/* ═══ Glass Nav (Apple-style) ═══ */
+.sidebar{width:240px;background:rgba(0,0,0,0.85);backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);border-{% if dir=='rtl' %}left{% else %}right{% endif %}:1px solid rgba(255,255,255,0.06);padding:0;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
+.sidebar .logo{padding:1.25rem 1.25rem .5rem}
+.sidebar .logo .logo-text{font-size:1.1rem;font-weight:700;color:var(--text-title);letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.sidebar .logo .logo-icon{width:24px;height:24px;border-radius:5px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:#fff;font-weight:700;flex-shrink:0}
+.sidebar .logo .logo-sub{font-size:.7rem;color:var(--text-faint);margin-top:1px;font-weight:400;padding-{% if dir=='rtl' %}right{% else %}left{% endif %}:34px;letter-spacing:0}
+.sidebar nav{padding:.25rem .6rem;flex:1;display:flex;flex-direction:column;gap:0}
+.sidebar nav a{padding:8px 12px;border-radius:var(--radius);color:var(--text-faint);font-size:.78rem;font-weight:500;display:flex;align-items:center;gap:10px;text-decoration:none;transition:all .15s}
+.sidebar nav a:hover{color:var(--text-muted);background:rgba(255,255,255,0.04)}
+.sidebar nav a.active{color:var(--accent);background:var(--accent-soft);font-weight:600}
+.sidebar nav a .nav-i{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.5}
+.sidebar nav a.active .nav-i{opacity:1}
+.sidebar nav a .nav-i svg{width:16px;height:16px}
+.sidebar .sb-foot{padding:.6rem 1rem;border-top:1px solid rgba(255,255,255,0.06);margin-top:auto}
+.sidebar .sb-foot .u-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.sidebar .sb-foot .u-av{width:22px;height:22px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;color:var(--accent);flex-shrink:0}
+.sidebar .sb-foot .u-name{font-size:.7rem;color:var(--text-faint);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar .sb-foot .logout{font-size:.65rem;color:var(--text-faint);display:flex;align-items:center;gap:5px;padding:2px 0;transition:color .15s}
+.sidebar .sb-foot .logout:hover{color:var(--red)}
+
+/* ═══ Main Content ═══ */
+.wrapper{display:flex;min-height:100vh}
+.main{flex:1;padding:2rem 2.5rem;max-width:1200px;min-width:0}
+
+/* ═══ Page Header ═══ */
+.pg-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.75rem;flex-wrap:wrap;gap:10px}
+.pg-hdr h1{font-size:1.4rem;font-weight:600;color:var(--text-title);letter-spacing:-.02em}
+.pg-hdr-actions{display:flex;align-items:center;gap:10px}
+
+/* ═══ Select (Apple Clean) ═══ */
+.sl{background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);padding:6px 12px;border-radius:var(--radius);cursor:pointer;font-size:.75rem;font-family:var(--font);outline:none;min-width:100px;-webkit-appearance:none;appearance:none;letter-spacing:-.01em;padding-{% if dir=='rtl' %}left{% else %}right{% endif %}:28px}
+.sl:focus{border-color:var(--accent)}
+
+/* ═══ Buttons (Apple-style) ═══ */
+.btn{background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);padding:8px 18px;border-radius:var(--radius-pill);cursor:pointer;font-size:.78rem;font-family:var(--font);font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--bg-card-hover);color:var(--text-body)}
+.btn-p{background:var(--accent);color:#fff;border:none}
+.btn-p:hover{background:#0077ed;color:#fff;transform:none}
+.btn-sm{padding:5px 12px;font-size:.7rem}
+.btn-ic{width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%}
+
+/* ═══ Cards (no borders, just bg contrast) ═══ */
+.cd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:1.5rem}
+.cd{background:var(--bg-card);border-radius:var(--radius-lg);padding:1.15rem;transition:all .15s}
+.cd:hover{background:var(--bg-card-hover)}
+.cd .cd-l{color:var(--text-faint);font-size:.68rem;margin-bottom:3px;font-weight:500;letter-spacing:.02em}
+.cd .cd-v{font-size:1.5rem;font-weight:700;color:var(--text-title);letter-spacing:-.03em;line-height:1.2}
+.cd .cd-s{color:var(--text-faint);font-size:.65rem;margin-top:3px}
+
+/* ═══ Charts ═══ */
+.cht-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.5rem}
+@media(max-width:900px){.cht-grid{grid-template-columns:1fr}}
+.cht-cd{background:var(--bg-card);border-radius:var(--radius-lg);padding:1rem}
+.cht-cd h3{font-size:.8rem;color:var(--text-faint);margin-bottom:10px;font-weight:500}
+.cht-cd .cht-w{position:relative;height:260px}
+
+/* ═══ Tables (clean, no borders) ═══ */
+.tw{overflow-x:auto;margin-bottom:1.5rem;background:var(--bg-card);border-radius:var(--radius-lg)}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{padding:10px 14px;text-align:{% if dir=='rtl' %}right{% else %}left{% endif %};font-weight:500;color:var(--text-faint);white-space:nowrap;font-size:.68rem;letter-spacing:.02em;border-bottom:1px solid rgba(255,255,255,0.06)}
+td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text-muted)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg-card-hover);border-radius:var(--radius)}
+
+/* ═══ Platform Tags ═══ */
+.pt{display:inline-block;padding:2px 10px;border-radius:var(--radius-pill);font-size:.65rem;font-weight:600;letter-spacing:.02em}
+.pt.uber{background:var(--green-soft);color:var(--green)}
+.pt.didi{background:rgba(255,159,10,0.12);color:var(--didi)}
+.pt.indrive{background:var(--red-soft);color:var(--red)}
+.pt.vip{background:var(--accent-soft);color:var(--accent)}
+
+/* ═══ Modal (clean overlay) ═══ */
+.mo{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:1000;backdrop-filter:blur(12px)}
+.mo.active{display:flex;align-items:center;justify-content:center}
+.m{background:var(--bg-card);border-radius:var(--radius-lg);padding:1.5rem;width:440px;max-width:92vw;max-height:85vh;overflow-y:auto}
+.m h2{font-size:1rem;font-weight:600;color:var(--text-title);margin-bottom:.75rem;letter-spacing:-.02em}
+.fg{margin-bottom:12px}
+.fg label{display:block;margin-bottom:4px;color:var(--text-faint);font-size:.74rem;font-weight:500}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input,select,textarea{background:var(--bg-input);border:1px solid var(--border);color:var(--text-body);padding:9px 12px;border-radius:var(--radius);width:100%;font-family:var(--font);font-size:.8rem;outline:none;transition:border-color .15s;letter-spacing:-.01em}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.ma{display:flex;gap:10px;margin-top:1.25rem}
+.ma .btn{flex:1;justify-content:center}
+
+/* ═══ Toast ═══ */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--bg-card);border-radius:var(--radius-pill);padding:10px 24px;font-size:.78rem;z-index:2000;opacity:0;transition:opacity .25s;pointer-events:none;letter-spacing:-.01em}
+.toast.show{opacity:1;pointer-events:auto}
+
+/* ═══ Empty State ═══ */
+.es{text-align:center;padding:3rem 1rem;color:var(--text-faint)}
+.es h3{color:var(--text-muted);margin-bottom:6px;font-weight:500}
+
+/* ═══ Mobile Bottom Nav (Apple-style glass) ═══ */
+.mn{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);backdrop-filter:saturate(180%) blur(24px);border-top:1px solid rgba(255,255,255,0.06);z-index:999;padding:2px 0 env(safe-area-inset-bottom,3px)}
+.mn-w{display:flex;justify-content:center;gap:0}
+.mn a{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 6px;min-width:42px;text-decoration:none;color:var(--text-faint);font-size:.45rem;font-weight:500;transition:all .1s}
+.mn a.active{color:var(--accent)}
+.mn a .mn-i{width:18px;height:18px;display:flex;align-items:center;justify-content:center}
+.mn a .mn-i svg{width:15px;height:15px;opacity:.5}
+.mn a.active .mn-i svg{opacity:1}
+@media(max-width:600px){.mn{display:block}}
+
+/* ═══ Responsive ═══ */
+@media(max-width:900px){
+  .sidebar{width:60px}
+  .sidebar .logo{padding:.8rem .5rem}
+  .sidebar .logo .logo-sub,.sidebar .logo .logo-text span{display:none}
+  .sidebar .logo .logo-text{justify-content:center}
+  .sidebar nav{padding:.3rem .2rem}
+  .sidebar nav a{justify-content:center;padding:10px}
+  .sidebar nav a span{display:none}
+  .sidebar .sb-foot{padding:.4rem;display:flex;flex-direction:column;align-items:center}
+  .sidebar .sb-foot .u-name{display:none}
+  .sidebar .sb-foot .logout span{display:none}
+  .cht-grid{grid-template-columns:1fr}
+  .main{padding:1rem .75rem 5rem}
+  .cd-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+  .sidebar{display:none}
+  .main{padding:.75rem .6rem 5rem}
+  .cd-grid{grid-template-columns:1fr}
+  .fr{grid-template-columns:1fr}
+  .pg-hdr h1{font-size:1.15rem}
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-text">
+        <div class="logo-icon">D</div>
+        <span>Driver Dashboard</span>
+      </div>
+      <div class="logo-sub">{{ _('متتبع الارباح') }}</div>
+    </div>
+    <nav>
+      {% if user %}
+        {% if user.role == 'owner' %}
+        <a href="/owner-dashboard" data-page="dashboard"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span>{{ _('لوحة المالك') }}</span></a>
+        <a href="/cars" data-page="cars"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17h14M5 17a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2M5 17l2-4h10l2 4M7 17a2 2 0 1 0 4 0M13 17a2 2 0 1 0 4 0"/></svg></span><span>{{ _('العربيات') }}</span></a>
+        <a href="/drivers" data-page="drivers"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span>{{ _('السواقين') }}</span></a>
+        <a href="/verify" data-page="verify"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M12 22c-5.5 0-10-4.5-10-10S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z"/></svg></span><span>{{ _('التوثيق') }}</span></a>
+        <a href="/settings" data-page="settings"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span>{{ _('الاعدادات') }}</span></a>
+        {% else %}
+        <a href="/driver-connect" data-page="dashboard"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span>{{ _('الرئيسية') }}</span></a>
+        <a href="/revenue" data-page="revenue"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span>{{ _('الايرادات') }}</span></a>
+        <a href="/expenses" data-page="expenses"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span>{{ _('المصروفات') }}</span></a>
+        <a href="/reports" data-page="reports"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span><span>{{ _('التقارير') }}</span></a>
+        <a href="/settings" data-page="settings"><span class="nav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span>{{ _('الاعدادات') }}</span></a>
+        {% endif %}
+      {% endif %}
+    </nav>
+    <div class="sb-foot">
+      {% if user %}
+      <div class="u-row">
+        <div class="u-av">{{ user.display_name|first|default(user.username|first|upper) }}</div>
+        <span class="u-name">{{ user.display_name or user.username }}</span>
+      </div>
+      <a href="#" onclick="logout()" class="logout">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>{{ _('تسجيل الخروج') }}</span>
+      </a>
+      {% endif %}
+    </div>
+  </aside>
+  <div class="main">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+{% include 'mobile_nav.html' %}
+<div class="toast" id="toast"></div>
+
+<script>
+document.querySelectorAll('.sidebar nav a, .mn a').forEach(a => {
+  a.classList.toggle('active', a.dataset.page === '{{ request.url.path.split("/")[1] or "dashboard" }}');
+});
+
+function toast(msg, color='var(--green)') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.border = '1px solid '+color; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function logout() {
+  if(!confirm('{{ _('تسجيل الخروج') }}؟')) return;
+  await fetch('/api/auth/logout', {method:'POST'});
+  window.location.href = '/login';
+}
+
+async function api(url, opts={}) {
+  const res = await fetch(url, {headers:{'Content-Type':'application/json'},...opts});
+  if(!res.ok) {
+    let msg = 'Error';
+    try { const j = await res.json(); msg = j.detail || j.message || j.error || msg; } catch(e) { msg = await res.text().catch(()=>msg); }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+{% if lang == 'ar' %}
+function fmt(v){return Number(v).toLocaleString('ar-EG',{minimumFractionDigits:0,maximumFractionDigits:2})}
+{% else %}
+function fmt(v){return Number(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2})}
+{% endif %}
+
+function openModal(id){document.getElementById(id).classList.add('active')}
+function closeModal(id){document.getElementById(id).classList.remove('active')}
+document.querySelectorAll('.mo').forEach(m => {
+  m.addEventListener('click', e => {if(e.target===m)m.classList.remove('active')});
+});
+
+function trackLocation() {
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    pos => fetch('/api/location', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy,source:'web'}),credentials:'same-origin'}).catch(()=>{}),
+    ()=>{},{enableHighAccuracy:true,timeout:10000});
+}
+trackLocation();
+setInterval(trackLocation, 300000);
+
+const PF_NAMES = {uber:'Uber',didi:'Didi',indrive:'InDrive',personal:'VIP Trip'};
+const PF_COLORS = {uber:'#000000',didi:'#FF6600',indrive:'#00B14F',personal:'#0071e3'};
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.verify-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.verify-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:all .2s}
+.verify-card:hover{border-color:var(--text2)}
+.verify-card .vc-head{background:var(--bg3);padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
+.verify-card .vc-head .vc-name{font-weight:600;font-size:.85rem}
+.verify-card .vc-head .vc-badge{font-size:.7rem;padding:3px 10px;border-radius:20px;font-weight:600}
+.verify-card .vc-body{padding:14px}
+.verify-card .vc-body .vc-info{font-size:.75rem;color:var(--text2);margin-bottom:10px;line-height:1.6}
+.verify-card .vc-body .vc-info span{color:var(--text)}
+.verify-card .vc-docs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px}
+.verify-card .vc-docs .vd-item{border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .15s;position:relative}
+.verify-card .vc-docs .vd-item:hover{border-color:var(--accent)}
+.verify-card .vc-docs .vd-item img{width:100%;height:80px;object-fit:cover;display:block}
+.verify-card .vc-docs .vd-item .vd-label{font-size:.6rem;color:var(--text2);text-align:center;padding:3px;background:var(--bg3)}
+.verify-card .vc-docs .vd-item .vd-empty{height:80px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:.65rem;background:var(--bg3)}
+.verify-card .vc-actions{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--border)}
+.verify-card .vc-actions .btn{flex:1;padding:8px;font-size:.78rem;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-weight:600;transition:all .15s}
+.verify-card .vc-actions .btn-approve{background:var(--green);color:#fff}
+.verify-card .vc-actions .btn-approve:hover{filter:brightness(1.15)}
+.verify-card .vc-actions .btn-reject{background:var(--red);color:#fff}
+.verify-card .vc-actions .btn-reject:hover{filter:brightness(1.15)}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--text2)}
+.empty-state .icon{font-size:3rem;margin-bottom:8px}
+</style>
+
+<div class="header">
+  <h1>توثيق السواقين</h1>
+</div>
+
+<div class="verify-grid" id="verifyGrid"></div>
+
+<script>
+async function loadDrivers() {
+  const grid = document.getElementById('verifyGrid');
+  grid.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text2)">جاري التحميل...</div>';
+  
+  try {
+    const r = await api('/api/owner/drivers');
+    const drivers = r.drivers || [];
+    
+    if(drivers.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><div class="icon"></div><h3>لا يوجد سواقين</h3></div>';
+      return;
+    }
+    
+    grid.innerHTML = '';
+    for(const d of drivers) {
+      const docs = await api(`/api/driver-documents/${d.id}`);
+      
+      const hasLicense = docs.license_photo ? true : false;
+      const hasCarReg = docs.car_reg_photo ? true : false;
+      const hasNational = docs.national_id_photo ? true : false;
+      const uploaded = [hasLicense, hasCarReg, hasNational].filter(Boolean).length;
+      const verified = d.car_verified == 1;
+      
+      grid.innerHTML += `
+        <div class="verify-card" style="border-color:${verified ? 'var(--green)' : 'var(--border)'}">
+          <div class="vc-head">
+            <div class="vc-name" style="color:${verified ? 'var(--green)' : 'var(--text)'}">${d.username}</div>
+            ${verified 
+              ? '<span class="vc-badge" style="background:var(--green);color:#fff">موثق</span>' 
+              : `<span class="vc-badge" style="background:var(--bg3);color:var(--text2);border:1px solid var(--border)">${uploaded}/3 مستندات</span>`
+            }
+          </div>
+          <div class="vc-body">
+            <div class="vc-info">
+              اللوحة: <span>${d.plate_number || '—'}</span><br>
+              الموبايل: <span>${d.mobile || '—'}</span><br>
+              القومي: <span>${d.national_id ? d.national_id.slice(0,6)+'********' : '—'}</span><br>
+              المحافظة: <span>${d.governorate || '—'}</span>
+            </div>
+            <div class="vc-docs">
+              <div class="vd-item" onclick="viewDoc('${docs.license_photo || ''}','رخصة القيادة')">
+                ${hasLicense ? `<img src="${docs.license_photo}"><div class="vd-label">رخصة القيادة</div>` : '<div class="vd-empty">لا توجد</div>'}
+              </div>
+              <div class="vd-item" onclick="viewDoc('${docs.car_reg_photo || ''}','رخصة السيارة')">
+                ${hasCarReg ? `<img src="${docs.car_reg_photo}"><div class="vd-label">رخصة السيارة</div>` : '<div class="vd-empty">لا توجد</div>'}
+              </div>
+              <div class="vd-item" onclick="viewDoc('${docs.national_id_photo || ''}','الرقم القومي')">
+                ${hasNational ? `<img src="${docs.national_id_photo}"><div class="vd-label">الرقم القومي</div>` : '<div class="vd-empty">لا توجد</div>'}
+              </div>
+            </div>
+          </div>
+          <div class="vc-actions">
+            ${verified
+              ? `<button class="btn btn-reject" onclick="toggleVerify(${d.id}, 0)">الغاء التوثيق</button>`
+              : `<button class="btn btn-approve" onclick="toggleVerify(${d.id}, 1)" ${uploaded < 3 ? 'disabled style="opacity:0.5"' : ''}>توثيق</button>
+                 <button class="btn btn-reject" onclick="notifyDriver(${d.id})">اشعار</button>`
+            }
+          </div>
+        </div>`;
+    }
+  } catch(e) {
+    grid.innerHTML = `<div class="empty-state"><div class="icon"></div><h3>خطا في التحميل</h3><p>${e.message}</p></div>`;
+  }
+}
+
+async function toggleVerify(driverId, status) {
+  try {
+    const r = await api(`/api/verify-driver/${driverId}`, {
+      method:'POST',
+      body: JSON.stringify({status: status})
+    });
+    toast(r.message);
+    loadDrivers();
+  } catch(e) {
+    toast('خطا: ' + e.message);
+  }
+}
+
+function viewDoc(url, label) {
+  if(!url) { toast('لا يوجد مستند'); return; }
+  window.open(url, '_blank', 'width=800,height=600');
+}
+
+function notifyDriver(id) {
+  toast('تم ارسال اشعار للسواق');
+}
+
+document.addEventListener('DOMContentLoaded', loadDrivers);
+</script>
+{% endblock %}

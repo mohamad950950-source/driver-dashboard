@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header">
+  <h1>{{ _('التقارير والتحليلات') }}</h1>
+  <div class="header-left">
+    <select class="period-select" id="reportPeriod" onchange="loadReport()">
+      <option value="7">{{ _('آخر 7 ايام') }}</option>
+      <option value="30" selected>{{ _('آخر 30 يوم') }}</option>
+      <option value="90">{{ _('آخر 3 شهور') }}</option>
+      <option value="365">{{ _('آخر سنة') }}</option>
+    </select>
+    <button class="btn btn-green" onclick="exportReport()">{{ _('تصدير') }}</button>
+  </div>
+</div>
+
+<div class="charts-grid" style="margin-bottom:1.25rem">
+  <div class="chart-card">
+    <h3>{{ _('التحليل الاسبوعي (آخر 12 اسبوع)') }}</h3>
+    <div class="chart-wrap" style="height:220px"><canvas id="trendChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <h3>{{ _('احصائيات شاملة') }}</h3>
+    <div id="statsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px">
+      <div style="background:var(--bg3);padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--green)" id="statTrips">—</div>
+        <div style="font-size:.72rem;color:var(--text2)">{{ _('اجمالي المشاوير') }}</div>
+      </div>
+      <div style="background:var(--bg3);padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--accent)" id="statRevenue">—</div>
+        <div style="font-size:.72rem;color:var(--text2)">{{ _('اجمالي الايرادات') }}</div>
+      </div>
+      <div style="background:var(--bg3);padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--orange)" id="statKm">—</div>
+        <div style="font-size:.72rem;color:var(--text2)">{{ _('اجمالي الكيلومترات') }}</div>
+      </div>
+      <div style="background:var(--bg3);padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--purple)" id="statAvg">—</div>
+        <div style="font-size:.72rem;color:var(--text2)">{{ _('متوسط الاجرة') }}</div>
+      </div>
+    </div>
+    <h3>{{ _('افضل المنصات') }}</h3>
+    <div id="bestPlatform" style="padding:0 10px 10px;font-size:.82rem;color:var(--text2)"></div>
+  </div>
+</div>
+
+<h3 style="font-size:.85rem;color:var(--text2);margin-bottom:10px">{{ _('تقرير الاسبوع الماضي') }}</h3>
+<div class="card" id="weekReport">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="weekStats"></div>
+</div>
+
+<script>
+let trendChart;
+
+async function loadReport() {
+  const days = document.getElementById('reportPeriod').value;
+  const s = await api(`/api/driver-summary?period=${days >= 90 ? 'year' : days >= 30 ? 'month' : 'week'}`);
+  const t = await api(`/api/trends?days=${days}`);
+  
+  // Stats
+  const totalTrips = s.revenue.reduce((a,r) => a + r.trip_count, 0);
+  document.getElementById('statTrips').textContent = totalTrips;
+  document.getElementById('statRevenue').textContent = fmt(s.total_net_revenue) + ' {{ _('ج.م') }}';
+  document.getElementById('statKm').textContent = fmt(s.total_km) + ' {{ _('كم') }}';
+  document.getElementById('statAvg').textContent = fmt(s.total_net_revenue / (totalTrips||1)) + ' {{ _('ج.م') }}';
+  
+  // Best platform
+  const bp = document.getElementById('bestPlatform');
+  if(s.revenue.length) {
+    const best = s.revenue.reduce((a,b) => a.net_revenue > b.net_revenue ? a : b);
+    bp.innerHTML = `1- ${best.platform}: ${fmt(best.net_revenue)} {{ _('ج.م') }} (${best.trip_count} {{ _('مشاوير') }})`;
+  }
+  
+  // Weekly chart
+  if(trendChart) trendChart.destroy();
+  if(t.weekly && t.weekly.length) {
+    trendChart = new Chart(document.getElementById('trendChart'), {
+      type:'bar',
+      data:{labels:t.weekly.map(w=>w.week), datasets:[
+        {label:'{{ _('مشاوير') }}',data:t.weekly.map(w=>w.trips),backgroundColor:'#58a6ff88',borderColor:'#58a6ff',borderWidth:1,yAxisID:'y'},
+        {label:'{{ _('ايراد') }}',data:t.weekly.map(w=>w.net),backgroundColor:'#3fb95088',borderColor:'#3fb950',borderWidth:1,yAxisID:'y1'}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#8b949e',font:{size:9}}}},
+        scales:{x:{ticks:{color:'#8b949e',font:{size:8},maxTicksLimit:12},grid:{display:false}},
+                y:{position:'left',ticks:{color:'#8b949e',font:{size:8}},grid:{color:'#21262d'},beginAtZero:true},
+                y1:{position:'right',ticks:{color:'#8b949e',font:{size:8}},grid:{display:false},beginAtZero:true}}
+      }
+    });
+  }
+  
+  // Week report
+  const ws = document.getElementById('weekStats');
+  const weekRevenue = s.revenue.filter(r => r.platform);
+  ws.innerHTML = weekRevenue.length ? weekRevenue.map(r =>
+    `<div style="background:var(--bg3);padding:10px;border-radius:8px">
+      <div style="font-weight:700;font-size:.85rem">${r.platform}</div>
+      <div style="font-size:.75rem;color:var(--text2);line-height:1.6">
+        <span>{{ _('مشاوير') }}: ${r.trip_count}</span><br>
+        <span>{{ _('ايراد') }}: ${fmt(r.net_revenue)} {{ _('ج.م') }}</span><br>
+        <span>{{ _('كم') }}: ${fmt(r.total_km)}</span><br>
+        <span>{{ _('متوسط') }}: ${fmt(r.avg_fare)} {{ _('ج.م') }}</span>
+      </div>
+    </div>`
+  ).join('') : '<div style="grid-column:1/-1;color:var(--text2);text-align:center;padding:1rem">{{ _('لا توجد بيانات') }}</div>';
+}
+
+async function exportReport() {
+  try {
+    const s = await api('/api/driver-summary?period=month');
+    const lines = ['{{ _('Driver Dashboard - تقرير شهري') }}','------------------'];
+    lines.push(`{{ _('اجمالي الايرادات') }}: ${fmt(s.total_net_revenue)} {{ _('ج.م') }}`);
+    lines.push(`{{ _('المشاوير') }}: ${s.revenue.reduce((a,r) => a + r.trip_count, 0)}`);
+    lines.push(`{{ _('المسافة') }}: ${fmt(s.total_km)} {{ _('كم') }}`);
+    lines.push(`{{ _('نصيبك') }}: ${fmt(s.your_share)} {{ _('ج.م') }}`);
+    lines.push(`{{ _('صافي الربح') }}: ${fmt(s.net_profit)} {{ _('ج.م') }}`);
+    const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `driver-report-${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+  } catch(e) {
+    toast('{{ _('خطا') }}: ' + e.message, 'var(--red)');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadReport);
+</script>
+{% endblock %}

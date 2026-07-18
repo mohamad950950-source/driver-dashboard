@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.car-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:1.25rem}
+.cc{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem;transition:border-color .18s}
+.cc:hover{border-color:var(--border-hover)}
+.cc .cc-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cc .cc-name{font-weight:600;font-size:.9rem;color:var(--text-title)}
+.cc .cc-plate{font-size:.7rem;color:var(--text-faint);margin-{% if dir=='rtl' %}right{% else %}left{% endif %}:10px}
+.cc .cc-row{display:flex;justify-content:space-between;padding:4px 0;font-size:.78rem;color:var(--text-muted);border-bottom:1px solid var(--border)}
+.cc .cc-row:last-child{border-bottom:none}
+.cc .cc-driver{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 8px;background:var(--bg-app);border-radius:var(--radius-sm)}
+.cc .cc-driver .cd-av{width:22px;height:22px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;color:var(--accent);flex-shrink:0}
+.cc .cc-driver .cd-name{font-size:.76rem;color:var(--text-body);flex:1}
+.cc .cc-driver .cd-unassign{font-size:.65rem;color:var(--text-faint);cursor:pointer}
+.cc .cc-driver .cd-unassign:hover{color:var(--red)}
+.cc .cc-empty-driver{display:flex;gap:8px;margin-top:6px}
+.cc .cc-empty-driver input{flex:1;background:var(--bg-input);border:1px solid var(--border);color:var(--text-body);padding:6px 10px;border-radius:var(--radius-sm);font-size:.75rem;font-family:var(--font)}
+.cc .cc-empty-driver input:focus{border-color:var(--accent)}
+.cc .cc-empty-driver button{padding:6px 12px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-size:.72rem;font-weight:500;cursor:pointer;white-space:nowrap}
+.action-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.action-bar .btn{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-pill);border:none;font-size:.78rem;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .15s}
+.action-bar .btn-primary{background:var(--accent);color:#fff}
+.action-bar .btn-primary:hover{opacity:.9}
+</style>
+
+<div class="pg-hdr"><h1>{{ _('العربيات') }}</h1></div>
+
+<div class="action-bar">
+  <button class="btn btn-primary" onclick="showAddCar()">+ {{ _('اضافة عربية') }}</button>
+</div>
+
+<div class="car-grid" id="carGrid"></div>
+
+<script>
+async function loadCars(){
+  const g=document.getElementById('carGrid');g.innerHTML='<div class="es"><h3>{{ _('تحميل...') }}</h3></div>';
+  try{
+    const r=await api('/api/owner/cars');
+    g.innerHTML='';
+    r.cars.forEach(c=>{
+      const dn=c.display_name||c.driver_name||'';
+      g.innerHTML+='<div class="cc"><div class="cc-hdr"><div><span class="cc-name">'+(c.car_name||'{{ _('عربية') }}')+'</span><span class="cc-plate">'+(c.plate_number||'')+'</span></div><span style="font-size:.7rem;color:var(--text-faint)">'+c.driver_split_pct+'%</span></div>'+
+        (c.driver_id
+          ? '<div class="cc-driver"><div class="cd-av">'+(dn.charAt(0)||'?').toUpperCase()+'</div><span class="cd-name">'+dn+'</span><span class="cd-unassign" onclick="unassign('+c.car_id+')">{{ _('فك الربط') }}</span></div>'
+          : '<div class="cc-empty-driver"><input type="tel" id="assignPhone_'+c.car_id+'" placeholder="{{ _('رقم تلفون السواق') }}" dir="ltr"><button onclick="assign('+c.car_id+')">{{ _('ربط') }}</button></div>'
+        )+'<div class="cc-row"><span>{{ _('نسبة السواق') }}</span><span>'+c.driver_split_pct+'%</span></div></div>';
+    });
+    if(!r.cars.length) g.innerHTML='<div class="es"><h3>{{ _('لا يوجد عربيات') }}</h3><p>{{ _('اضف عربية جديدة عشان تبدأ') }}</p></div>';
+  }catch(e){document.getElementById('carGrid').innerHTML='<div class="es"><h3>{{ _('خطأ') }}</h3><p>'+e.message+'</p></div>'}
+}
+
+async function assign(carId){
+  const phone=document.getElementById('assignPhone_'+carId).value.trim();
+  if(!phone){toast('{{ _('ادخل رقم التلفون') }}','var(--red)');return}
+  try{
+    const r=await api('/api/owner/cars/'+carId+'/assign',{method:'POST',body:JSON.stringify({phone})});
+    toast(r.message);loadCars();
+  }catch(e){toast(e.message,'var(--red)')}
+}
+
+async function unassign(carId){
+  if(!confirm('{{ _('فك ربط السواق؟') }}')) return;
+  try{
+    await api('/api/owner/cars/'+carId+'/unassign',{method:'POST'});
+    loadCars();
+  }catch(e){toast(e.message,'var(--red)')}
+}
+
+function showAddCar(){
+  const name=prompt('{{ _('اسم العربية') }}','{{ _('عربية جديدة') }}');
+  if(!name||!name.trim())return;
+  const plate=prompt('{{ _('رقم اللوحة') }}','');
+  const split=prompt('{{ _('نسبة السواق (%)') }}','50');
+  api('/api/owner/cars',{method:'POST',body:JSON.stringify({car_name:name.trim(),plate_number:plate||'',driver_split_pct:parseFloat(split||50)})}).then(r=>{toast(r.message);loadCars()}).catch(e=>toast(e.message,'var(--red)'));
+}
+
+document.addEventListener('DOMContentLoaded',loadCars);
+</script>
+{% endblock %}
