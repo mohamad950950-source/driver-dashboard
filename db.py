@@ -117,8 +117,12 @@ if USE_POSTGRES:
         return dict(row)
 
 else:
-    # ── SQLite (local dev) ──
-    DATA_DIR = BASE / "data"
+    # ── SQLite (local dev) — use /tmp on serverless (Netlify Lambda) ──
+    import tempfile
+    if os.getenv("NETLIFY") or not os.access(str(BASE), os.W_OK):
+        DATA_DIR = Path(tempfile.gettempdir()) / "driver-dash-data"
+    else:
+        DATA_DIR = BASE / "data"
     DATA_DIR.mkdir(exist_ok=True)
     DB = str(DATA_DIR / "driver.db")
 
