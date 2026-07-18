@@ -4,8 +4,7 @@
   publish = "."
 
 [functions]
-  # Python 3.11 is default on Netlify
-  included_files = ["templates/**", "api/**", "db.py", "app.py", "schema_pg.py", "translations.py"]
+  included_files = ["templates/**", "api/**", "db.py", "app.py", "schema_pg.py", "translations.py", "static/**"]
 
 [[redirects]]
   from = "/api/*"
@@ -26,9 +25,3 @@
   from = "/*"
   to = "/.netlify/functions/main"
   status = 200
-  
-[functions.main]
-  # Mangum handler
-  handler = "main.handler"
-  # Set high memory for Jinja2 rendering
-  included_files = ["templates/**"]
