@@ -1,41 +1,44 @@
 """
-Netlify Function handler — wraps FastAPI with Mangum.
-Cold-start optimized: imports are lazy.
+Super simple Netlify Function — no Mangum, no FastAPI.
+Just a raw ASGI handler to diagnose the issue.
 """
-import sys, os, traceback
+import sys, os, json, traceback
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 os.chdir(str(HERE))
 
-from mangum import Mangum
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-
-# Lightweight app with just health endpoints (instant)
-app = FastAPI(title="Driver Dashboard", version="2.0.0")
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok", "version": "2.0.0"}
-
-# Try to import the real app — errors are caught
-_error = None
-try:
-    from app import app as real_app, setup_routes
-    # Mount all routes from real app
-    for r in real_app.routes:
-        app.router.routes.append(r)
-except Exception as e:
-    _error = e
-    tb = traceback.format_exc()
+def handler(event, context):
+    """Direct Netlify Function handler."""
+    # First try: just a health check without any imports
+    path = event.get("path", "/")
+    method = event.get("httpMethod", "GET")
     
-    @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"])
-    async def catch_all(request: Request, path: str):
-        return JSONResponse(
-            {"status": "error", "message": str(_error), "traceback": tb.split("\n")[-8:]},
-            status_code=503
-        )
-
-handler = Mangum(app, lifespan="off")
+    if path == "/api/health" and method == "GET":
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"status": "ok", "version": "2.0.0", "stage": "pre-import"})
+        }
+    
+    # Try importing the full app
+    try:
+        from mangum import Mangum
+        from app import app
+        mangum_handler = Mangum(app, lifespan="off")
+        return mangum_handler(event, context)
+    except Exception as e:
+        tb = traceback.format_exc()
+        # Return the error so we can see what went wrong
+        return {
+            "statusCode": 500,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({
+                "status": "error",
+                "message": str(e),
+                "traceback": tb.split("\n")[-10:],
+                "path": path,
+                "method": method
+            })
+        }
