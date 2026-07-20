@@ -53,6 +53,17 @@ input:focus{border-color:var(--accent)}
     <input type="text" id="plate" placeholder="مثال: س ج د 1234">
   </div>
 
+  <div class="fg" id="pinSetup" style="display:none">
+    <label>اختار PIN (4-6 أرقام)</label>
+    <input type="password" id="pinNew" inputmode="numeric" maxlength="6" placeholder="⚉ ⚉ ⚉ ⚉" autocomplete="off">
+    <div style="font-size:.65rem;color:var(--text-faint);margin-top:4px">هتحتاجه كل مرة تدخل فيها</div>
+  </div>
+
+  <div class="fg" id="pinEntry" style="display:none">
+    <label>PIN</label>
+    <input type="password" id="pinInput" inputmode="numeric" maxlength="6" placeholder="⚉ ⚉ ⚉ ⚉" autocomplete="off">
+  </div>
+
   <button class="btn" id="loginBtn" onclick="doLogin()">دخول</button>
 
   <div class="ft">حلل أرباحك عبر كل المنصات في مكان واحد</div>
@@ -91,16 +102,80 @@ async function doLogin() {
       if (!r.ok) throw new Error(d.detail || 'خطأ');
       window.location.href = '/owner-dashboard';
     } else {
-      // Driver: just phone, no password, no OTP
+      // Driver: step 1 — login with phone
       const r = await fetch('/api/auth/driver-login', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({phone})
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || 'خطأ');
-      window.location.href = '/driver-connect';
+
+      if (d.first_time) {
+        // First login — show PIN setup
+        document.getElementById('loginBtn').style.display = 'none';
+        document.getElementById('phoneRow').style.display = 'none';
+        document.querySelector('.rs').style.display = 'none';
+        document.getElementById('plateRow').style.display = 'none';
+        document.getElementById('pinEntry').style.display = 'none';
+        document.getElementById('pinSetup').style.display = 'block';
+        document.getElementById('descText').textContent = 'اختار PIN عشان تحمي بياناتك';
+        document.getElementById('pinNew').focus();
+        // Store temp_token and phone for later
+        window._tmp = d.temp_token;
+        window._phone = phone;
+        btn.disabled = false;
+        // Listen for PIN entry
+        document.getElementById('pinNew').onkeydown = async function(e) {
+          if (e.key === 'Enter') await submitPin();
+        };
+      } else if (d.needs_pin) {
+        // Existing user — show PIN entry
+        document.getElementById('loginBtn').style.display = 'none';
+        document.getElementById('phoneRow').style.display = 'none';
+        document.querySelector('.rs').style.display = 'none';
+        document.getElementById('plateRow').style.display = 'none';
+        document.getElementById('pinSetup').style.display = 'none';
+        document.getElementById('pinEntry').style.display = 'block';
+        document.getElementById('descText').textContent = 'حط الـ PIN';
+        document.getElementById('pinInput').focus();
+        window._tmp = d.temp_token;
+        btn.disabled = false;
+        document.getElementById('pinInput').onkeydown = async function(e) {
+          if (e.key === 'Enter') await verifyPin();
+        };
+      } else {
+        window.location.href = '/driver-connect';
+      }
     }
   } catch(e) { showE(e.message); btn.disabled = false; }
+}
+
+async function submitPin() {
+  const pin = document.getElementById('pinNew').value.trim();
+  if (!pin || pin.length < 4) { showE('PIN لازم 4-6 أرقام'); return; }
+  try {
+    const r = await fetch('/api/auth/set-pin', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pin, temp_token: window._tmp})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'خطأ');
+    window.location.href = '/driver-connect';
+  } catch(e) { showE(e.message); }
+}
+
+async function verifyPin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  if (!pin || pin.length < 4) { showE('PIN غلط'); return; }
+  try {
+    const r = await fetch('/api/auth/verify-pin', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pin, temp_token: window._tmp})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'خطأ');
+    window.location.href = '/driver-connect';
+  } catch(e) { showE(e.message); }
 }
 
 function showE(m) {

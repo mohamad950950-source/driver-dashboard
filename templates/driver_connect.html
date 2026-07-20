@@ -26,8 +26,8 @@
 </style>
 
 <div class="tc">
-  <div class="tv" id="tv">0 ج.م</div>
-  <div class="ts" id="ts">0 مشاوير اليوم</div>
+  <div class="tv" id="tv"><div class="sk sk-v" style="margin:0 auto"></div></div>
+  <div class="ts" id="ts"><div class="sk sk-s" style="margin:4px auto 0"></div></div>
   <div class="tb" id="tbrk"></div>
 </div>
 
@@ -98,13 +98,13 @@ async function ld(){
   try{
     const td=await api('/api/driver-summary?period=today');
     const net=td.total_net_revenue||0,tc=td.revenue.reduce((a,r)=>a+r.trip_count,0);
-    document.getElementById('tv').textContent=fmt(net)+' ج.م';
+    document.getElementById('tv').innerHTML=fmt(net)+' ج.م';
     document.getElementById('ts').textContent=tc+' مشاوير اليوم';
     const bk=document.getElementById('tbrk');bk.innerHTML='';
     (td.revenue||[]).forEach(r=>{bk.innerHTML+='<span style="color:'+(PF[r.platform]?.c||'var(--text-muted)')+'" onclick="window.location=\'/revenue?platform='+r.platform+'\'" style="cursor:pointer">'+(PF[r.platform]?.n||r.platform)+': '+fmt(r.net_revenue||0)+'</span>'})
-  }catch(e){}
+  }catch(e){toast('تعذر تحميل الإيرادات','var(--orange)')}
   let cp = {};
-  try{const ca=await api('/api/connected-accounts');ca.accounts.forEach(a=>{cp[a.platform]=a})}catch(e){}
+  try{const ca=await api('/api/connected-accounts');ca.accounts.forEach(a=>{cp[a.platform]=a})}catch(e){toast('تعذر تحميل حالة الاتصال','var(--orange)')}
   const g=document.getElementById('ag');
   const btns=[
     {id:'uber',l:PF.uber.l,c:'#000000',n:'Uber',d:'Connect',on:'oc',ch:cp['uber']?.status==='connected'},

@@ -121,7 +121,8 @@ def init_db():
             selfie_photo TEXT DEFAULT '',
             needs_setup INTEGER DEFAULT 0,
             display_name TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now','localtime'))
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            pin_hash TEXT DEFAULT ''
         );
         -- Safe migration: add driver_of_owner if missing
         CREATE TABLE IF NOT EXISTS sessions (
@@ -262,6 +263,11 @@ def init_db():
             conn.execute("ALTER TABLE users ADD COLUMN driver_of_owner INTEGER DEFAULT NULL")
         except:
             pass
+        # Migration: add pin_hash column if not exists
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN pin_hash TEXT DEFAULT ''")
+        except:
+            pass
         logger.info("DB initialized ✓")
 init_db()
 
@@ -377,49 +383,128 @@ def owner_login(data: dict):
     return resp
 @app.post("/api/auth/driver-login")
 def driver_login(data: dict):
-    """Driver logs in with just phone number. No OTP, no password.
-    Owner can also login as driver using the same phone."""
+    """Step 1: Driver logs in with phone. Returns temp_token.
+    If PIN is not set yet (first time), returns needs_pin=true.
+    If PIN is set, client must call /api/auth/verify-pin next."""
     phone = data.get("phone", "").strip()
     if not phone or len(phone) < 10:
         raise HTTPException(400, "ادخل رقم تلفون صحيح (10 أرقام على الأقل)")
 
     with get_db() as conn:
-        # Try to find as driver first
         user = conn.execute(
-            "SELECT * FROM users WHERE (mobile=? OR phone=? OR username=?) AND role='driver'",
+            "SELECT id, pin_hash, role FROM users WHERE (mobile=? OR phone=? OR username=?) AND role='driver'",
             (phone, phone, phone)
         ).fetchone()
 
         if not user:
-            # Check if this is an owner trying to drive
+            # Check if owner
             owner = conn.execute(
-                "SELECT * FROM users WHERE (mobile=? OR phone=? OR username=?) AND role='owner'",
+                "SELECT id FROM users WHERE (mobile=? OR phone=? OR username=?) AND role='owner'",
                 (phone, phone, phone)
             ).fetchone()
             if owner:
-                # Auto-create driver account for this owner
-                owner_dict = dict(owner)
+                owner_id = owner["id"]
                 pw_hash = hash_password(phone)
-                display_name = owner_dict.get('display_name', '') or 'Owner'
                 cur = conn.execute(
                     "INSERT INTO users (username, email, password_hash, role, phone, mobile, display_name) VALUES (?,?,?, 'driver', ?, ?, ?)",
-                    (phone + "_driver", f"{phone}@driver.local", pw_hash, phone, phone, f"{display_name} (سواق)")
+                    (phone + "_driver", f"{phone}@driver.local", pw_hash, phone, phone, "سواق")
                 )
                 user_id = cur.lastrowid
-                user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+                user = conn.execute("SELECT id, pin_hash, role FROM users WHERE id=?", (user_id,)).fetchone()
             else:
                 raise HTTPException(404, "رقم التلفون مش موجود — المالك لازم يضيفك الأول")
 
-        driver_id = user["id"]
+        user_id = user["id"]
+        has_pin = bool(user["pin_hash"])
 
-    token = create_session(driver_id)
-    logger.info(f"Driver login: {phone} (id={driver_id})")
+        # Create a temp token for PIN verification
+        temp_token = secrets.token_hex(32)
+        expires = (datetime.utcnow() + timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute(
+            "INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
+            (user_id, temp_token, expires)
+        )
 
     resp = JSONResponse({
-        "message": "تم تسجيل الدخول",
-        "user": {"id": driver_id, "role": "driver"}
+        "needs_pin": has_pin,
+        "temp_token": temp_token,
+        "message": "حط الـ PIN" if has_pin else "أول مرة — اختار PIN",
+        "user": {"id": user_id, "role": "driver"},
+        "first_time": not has_pin,
     })
+    resp.set_cookie(key="temp_token", value=temp_token, max_age=300, httponly=True, samesite="strict")
+    return resp
+
+
+@app.post("/api/auth/set-pin")
+def set_pin(data: dict, request: Request = None):
+    """Step 2 (first time): Set initial PIN after first login."""
+    pin = data.get("pin", "").strip()
+    temp_token = data.get("temp_token", "")
+    if not temp_token and request:
+        temp_token = request.cookies.get("temp_token", "")
+
+    if not pin or not pin.isdigit() or len(pin) < 4 or len(pin) > 6:
+        raise HTTPException(400, "PIN لازم يكون 4-6 أرقام")
+
+    with get_db() as conn:
+        session = conn.execute(
+            "SELECT user_id FROM sessions WHERE token=? AND expires_at > datetime('now')",
+            (temp_token,)
+        ).fetchone()
+        if not session:
+            raise HTTPException(401, "التوكن مش صحيح — سجل دخول تاني")
+
+        user_id = session["user_id"]
+        pin_hash = hash_password(pin)
+        conn.execute("UPDATE users SET pin_hash=? WHERE id=?", (pin_hash, user_id))
+        # Delete temp session
+        conn.execute("DELETE FROM sessions WHERE token=?", (temp_token,))
+
+    # Create real session
+    token = create_session(user_id)
+    resp = JSONResponse({"message": "تم ضبط PIN بنجاح"})
     resp.set_cookie(key=SESSION_COOKIE, value=token, max_age=COOKIE_MAX_AGE, httponly=True, samesite="strict", secure=not DEBUG)
+    resp.delete_cookie("temp_token")
+    return resp
+
+
+@app.post("/api/auth/verify-pin")
+def verify_pin(data: dict, request: Request = None):
+    """Step 2: Verify PIN and create real session."""
+    pin = data.get("pin", "").strip()
+    temp_token = data.get("temp_token", "")
+    if not temp_token and request:
+        temp_token = request.cookies.get("temp_token", "")
+
+    if not pin or not pin.isdigit() or len(pin) < 4:
+        raise HTTPException(400, "PIN غير صحيح")
+
+    with get_db() as conn:
+        session = conn.execute(
+            "SELECT user_id FROM sessions WHERE token=? AND expires_at > datetime('now')",
+            (temp_token,)
+        ).fetchone()
+        if not session:
+            raise HTTPException(401, "التوكن مش صحيح — سجل دخول تاني")
+
+        user_id = session["user_id"]
+        user = conn.execute("SELECT pin_hash FROM users WHERE id=?", (user_id,)).fetchone()
+        if not user or not user["pin_hash"]:
+            raise HTTPException(400, "مافيش PIN — استخدم set-pin أول مرة")
+
+        expected_hash = user["pin_hash"]
+        if not verify_password(pin, expected_hash):
+            raise HTTPException(403, "PIN غلط")
+
+        # Delete temp session
+        conn.execute("DELETE FROM sessions WHERE token=?", (temp_token,))
+
+    # Create real session
+    token = create_session(user_id)
+    resp = JSONResponse({"message": "تم تسجيل الدخول"})
+    resp.set_cookie(key=SESSION_COOKIE, value=token, max_age=COOKIE_MAX_AGE, httponly=True, samesite="strict", secure=not DEBUG)
+    resp.delete_cookie("temp_token")
     return resp
 
 
